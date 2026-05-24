@@ -1,0 +1,140 @@
+package com.karsunfde.foiapipeline.redaction_review.service;
+
+import com.karsunfde.foiapipeline.redaction_review.audit.EvalAuditLogger;
+import com.karsunfde.foiapipeline.redaction_review.client.AiOrchestratorClient;
+import com.karsunfde.foiapipeline.redaction_review.client.FoiaRequestClient;
+import com.karsunfde.foiapipeline.redaction_review.model.RedactionReview;
+import com.karsunfde.foiapipeline.redaction_review.model.RedactionReviewScore;
+import com.karsunfde.foiapipeline.redaction_review.repository.RedactionReviewRepository;
+import com.karsunfde.foiapipeline.redaction_review.repository.RedactionReviewScoreRepository;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.stereotype.Service;
+
+import java.time.Instant;
+import java.util.*;
+import java.util.stream.Collectors;
+
+/**
+ * Workflow 4 — redaction_review → consensus → source selection → award (pre-award).
+ *
+ * Brownfield-debt items reinforced:
+ *   - Item 3 — calls foia-request-service for each proposal text via
+ *     FoiaRequestClient (no circuit breaker).
+ *   - Item 2 — state transitions audit-logged via async.
+ *   - Item 4 reinforcement — SSDD draft response from ai-orchestrator goes
+ *     straight back; no structured-output schema enforcement.
+ */
+@Service
+public class RedactionReviewService {
+
+    private static final Logger log = LoggerFactory.getLogger(RedactionReviewService.class);
+
+    private final RedactionReviewRepository evalRepo;
+    private final RedactionReviewScoreRepository scoreRepo;
+    private final FoiaRequestClient foia_requestClient;
+    private final AiOrchestratorClient aiClient;
+    private final EvalAuditLogger auditLogger;
+
+    @Autowired
+    public RedactionReviewService(RedactionReviewRepository evalRepo,
+                             RedactionReviewScoreRepository scoreRepo,
+                             FoiaRequestClient foia_requestClient,
+                             AiOrchestratorClient aiClient,
+                             EvalAuditLogger auditLogger) {
+        this.evalRepo = evalRepo;
+        this.scoreRepo = scoreRepo;
+        this.foia_requestClient = foia_requestClient;
+        this.aiClient = aiClient;
+        this.auditLogger = auditLogger;
+    }
+
+    public RedactionReview create(String foia_requestId, String agencyId, String actor) {
+        RedactionReview e = new RedactionReview();
+        e.setFoiaRequestId(foia_requestId);
+        e.setAgencyId(agencyId);
+        e.setState("OPEN");
+        e.setCreatedAt(Instant.now());
+        RedactionReview saved = evalRepo.save(e);
+        auditLogger.recordAsync("EVAL_CREATE", "redaction_review", saved.getId(), actor, agencyId);
+        return saved;
+    }
+
+    public Optional<RedactionReview> findById(String id) {
+        return evalRepo.findById(id);
+    }
+
+    public Optional<RedactionReview> assignPanel(String redaction_reviewId, List<String> panelMembers, String actor) {
+        return evalRepo.findById(redaction_reviewId).map(e -> {
+            e.setPanelMembers(panelMembers);
+            e.setState("PANEL_ASSIGNED");
+            RedactionReview saved = evalRepo.save(e);
+            auditLogger.recordAsync("EVAL_PANEL_ASSIGN", "redaction_review", saved.getId(),
+                actor, e.getAgencyId());
+            return saved;
+        });
+    }
+
+    public Optional<RedactionReviewScore> submitScore(String redaction_reviewId, RedactionReviewScore in, String actor) {
+        Optional<RedactionReview> eOpt = evalRepo.findById(redaction_reviewId);
+        if (eOpt.isEmpty()) return Optional.empty();
+        RedactionReview e = eOpt.get();
+
+        // ⚠ Item 3 — fetches proposal context from foia-request-service for
+        // each score submission. No circuit breaker; under TEP-week load
+        // this is the thread-exhaustion reproducer.
+        Map<String, Object> proposal = foia_requestClient.getFoiaRequest(in.getProposalId());
+        log.info("score submission redaction_reviewId={} proposalId={} proposal-loaded={}",
+            redaction_reviewId, in.getProposalId(), proposal != null);
+
+        in.setRedactionReviewId(redaction_reviewId);
+        in.setScoredAt(Instant.now());
+        RedactionReviewScore saved = scoreRepo.save(in);
+
+        // ⚠ Item 2.
+        auditLogger.recordAsync("EVAL_SCORE", "score", saved.getId(),
+            actor, e.getAgencyId());
+
+        // Promote redaction_review state on first score.
+        if (!"SCORING".equals(e.getState())) {
+            e.setState("SCORING");
+            evalRepo.save(e);
+        }
+        return Optional.of(saved);
+    }
+
+    /** Aggregate panel consensus per proposal × factor. */
+    public Map<String, Map<String, Double>> consensus(String redaction_reviewId) {
+        List<RedactionReviewScore> scores = scoreRepo.findByRedactionReviewId(redaction_reviewId);
+        Map<String, List<RedactionReviewScore>> byProposal = scores.stream()
+            .collect(Collectors.groupingBy(RedactionReviewScore::getProposalId));
+        Map<String, Map<String, Double>> out = new LinkedHashMap<>();
+        for (Map.Entry<String, List<RedactionReviewScore>> p : byProposal.entrySet()) {
+            Map<String, Double> byFactor = p.getValue().stream()
+                .collect(Collectors.groupingBy(
+                    RedactionReviewScore::getFactorId,
+                    Collectors.averagingInt(RedactionReviewScore::getScore)));
+            out.put(p.getKey(), byFactor);
+        }
+        return out;
+    }
+
+    /** Generate Source Selection Decision Document via ai-orchestrator. */
+    public Optional<Map<String, Object>> draftSsdd(String redaction_reviewId, String actor) {
+        return evalRepo.findById(redaction_reviewId).map(e -> {
+            // ⚠ Item 4 reinforcement — raw response returned; no schema check.
+            Map<String, Object> resp = aiClient.draftSsdd(redaction_reviewId);
+            e.setState("CONSENSUS");
+            e.setConsensusAt(Instant.now());
+            // Store doc id placeholder from response if present.
+            if (resp != null && resp.get("clause_id") != null) {
+                e.setSsddDocId(resp.get("clause_id").toString());
+            }
+            evalRepo.save(e);
+            auditLogger.recordAsync("SSDD_DRAFT", "redaction_review", redaction_reviewId,
+                actor, e.getAgencyId());
+            return resp;
+        });
+    }
+}
