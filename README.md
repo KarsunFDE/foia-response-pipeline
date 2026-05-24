@@ -1,16 +1,39 @@
-# `foia-response-pipeline` — Federal Acquisitions Training Project
+# `foia-response-pipeline` — FOIA Request Processing (Pair Project, Cohort #1 Pair 3)
 
-> **Karsun-FDE 6-week intensive — Cohort #1 brownfield training repo.**
+> **Karsun-FDE 6-week intensive — Cohort #1 Pair 3 brownfield Pair Project.**
+> Derived from [`acquire-gov`](https://github.com/KarsunFDE/acquire-gov) on
+> 2026-05-24 via the `pair-brownfield-generator` skill (D-059) and reshaped
+> for the `foia-processing` aspect (D-045). Anchor real-system:
+> **FOIA.gov / DOJ OIP / agency FOIA portals**.
 >
-> Mirrors how Karsun's federal-acquisitions engagements actually deploy
-> (Angular SPA → Spring Boot microservices → Python/FastAPI AI orchestration
-> on AWS Bedrock + MongoDB Atlas + PostgreSQL) and is **deliberately imperfect**
-> so the cohort has real brownfield debt to inventory (W1 Tue) and modernise
-> (W4 Mon–Thu).
+> Inherits **all 12 baseline brownfield-debt items** from acquire-gov
+> (shared assessment baseline across all 3 pair-projects) PLUS **5
+> pair-unique debt items** distinct from Pair 1/2 (per D-059). See
+> `docs/brownfield-debt.md` (baseline) + `docs/pair-unique-debt.md`
+> (pair-unique) for the full inventory.
 
-## 🔗 Linked projects (Cohort #1)
+## Pair-Project identity
 
-This repo is the **template + training-project** for all 4 brownfields in the programme. The 3 pair-projects below are generated from this template W1 Wed PM via the `pair-brownfield-generator` skill, inheriting all 12 debt items + the architecture but reshaping the domain to each pair's federal-acquisitions aspect.
+| Field | Value |
+|-------|-------|
+| Pair number | 3 |
+| Cohort | Cohort #1 |
+| Aspect | `foia-processing` (FOIA Request Processing) |
+| ADR | `docs/adrs/0001-foia-processing-commitment.md` |
+| Domain mapping | `domain-mapping.md` |
+| Primary entity | `FoiaRequest` |
+| Review entity | `RedactionReview` |
+| Corpus | 5 USC 552 (FOIA), 28 CFR 16 (DOJ FOIA regs), OIP guidance |
+| Agent shape | multi-agent (redaction proposer + reviewer, HITL on irreversible release) |
+| Sibling pair-projects | [`grants-portal-modern`](https://github.com/KarsunFDE/grants-portal-modern) (Pair 1 — federal grants management), [`contract-payment-flow`](https://github.com/KarsunFDE/contract-payment-flow) (Pair 2 — post-award contract administration) |
+
+## 🔗 Sibling pair-projects (Cohort #1)
+
+All three pair-projects are generated from `acquire-gov` via the
+`pair-brownfield-generator` skill, inheriting all 12 baseline debt items + the
+architecture but reshaping the domain to each pair's federal-acquisitions
+aspect. Each pair also gets 5 distinct pair-unique debt items (D-059) — see
+your `docs/pair-unique-debt.md`.
 
 | Repo | Anchor (real federal system) | Domain focus |
 |------|------------------------------|--------------|
@@ -48,8 +71,8 @@ This repo is the **template + training-project** for all 4 brownfields in the pr
                   └──┬───────────┬──┬────┘
                      │           │  │ traceparent
         ┌────────────▼──┐  ┌─────▼──▼─────────┐
-        │ FoiaRequest   │  │ RedactionReview       │   ← Spring Boot 3.x
-        │ Service        │  │ Service          │
+        │ FoiaRequest    │  │ RedactionReview  │   ← Spring Boot 2.7.18 (legacy era)
+        │ Service        │  │ Service          │      Java 11, javax.*
         │ (Java) :8081   │  │ (Java) :8082     │
         └────┬───────┬───┘  └────┬─────┬───────┘
              │       │           │     │
@@ -76,9 +99,9 @@ This repo is the **template + training-project** for all 4 brownfields in the pr
 | Path | Service | Tech | Port |
 |------|---------|------|------|
 | `frontend/` | Angular SPA | Angular 17+ | 4200 |
-| `services/api-gateway/` | Auth edge + routing | Spring Boot 3.2 + Spring Cloud Gateway + OAuth2 Resource Server | 8080 |
-| `services/foia-request-service/` | FAR/DFARS foia_request CRUD | Spring Boot 3.2 + JPA (Postgres) + MongoDB | 8081 |
-| `services/redaction-review-service/` | RedactionReview panel coordination | Spring Boot 3.2 | 8082 |
+| `services/api-gateway/` | Auth edge + routing | Spring Boot 2.7.18 + Spring Security 5 + OAuth2 Resource Server | 8080 |
+| `services/foia-request-service/` | FAR/DFARS foia_request CRUD | Spring Boot 2.7.18 + JPA (Postgres) + MongoDB | 8081 |
+| `services/redaction-review-service/` | RedactionReview panel coordination | Spring Boot 2.7.18 | 8082 |
 | `services/ai-orchestrator/` | LLM/RAG/agent orchestration | Python 3.11 + FastAPI + LangChain v1.0 + Pydantic v2 + boto3 | 8000 |
 | `infra/docker/` | Local dev compose stack | Docker Compose | — |
 | `infra/github-actions/` | CI/CD workflows | GHA | — |
@@ -156,5 +179,7 @@ service healthchecks; OIDC-to-AWS deploy stub never actually deploys.
 ---
 
 Programme spec lives in the team's `fde-10-week/` workspace
-(`training-project/README.md` is the design source-of-truth; this repo is
-the **code home** the cohort clones).
+(`training-project/README.md` is the design source-of-truth). The trainer
+brownfield is [`acquire-gov`](https://github.com/KarsunFDE/acquire-gov);
+this repo is the **Pair 3 code home** that Cohort #1 Pair 3 clones on
+W1 Thu morning.
