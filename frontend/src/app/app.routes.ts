@@ -1,11 +1,11 @@
 import { Routes } from '@angular/router';
-import { FoiaRequestListComponent } from './components/foiaRequest-list/foiaRequest-list.component';
-import { FoiaRequestCreateComponent } from './components/foiaRequest-create/foiaRequest-create.component';
-import { RedactionReviewPanelComponent } from './components/redactionReview-panel/redactionReview-panel.component';
+import { FoiaRequestListComponent } from './components/foia-request-list/foia-request-list.component';
+import { FoiaRequestCreateComponent } from './components/foia-request-create/foia-request-create.component';
+import { RedactionReviewPanelComponent } from './components/redaction-review-panel/redaction-review-panel.component';
 import { OfficerDashboardComponent } from './components/officer-dashboard/officer-dashboard.component';
 import { ReportsHubComponent } from './components/reports-hub/reports-hub.component';
-import { FoiaRequestWizardComponent } from './components/foiaRequest-wizard/foiaRequest-wizard.component';
-import { FoiaRequestEditorComponent } from './components/foiaRequest-editor/foiaRequest-editor.component';
+import { FoiaRequestWizardComponent } from './components/foia-request-wizard/foia-request-wizard.component';
+import { FoiaRequestEditorComponent } from './components/foia-request-editor/foia-request-editor.component';
 import { AmendmentEditorComponent } from './components/amendment-editor/amendment-editor.component';
 import { QnaTriageComponent } from './components/qna-triage/qna-triage.component';
 import { ProposalIntakeComponent } from './components/proposal-intake/proposal-intake.component';

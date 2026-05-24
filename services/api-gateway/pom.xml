@@ -52,10 +52,12 @@
       <artifactId>spring-boot-starter-security</artifactId>
     </dependency>
     <!-- Nimbus JOSE is already on classpath via spring-security-oauth2-resource-server.
-         Declared explicitly so TokenService's import resolves cleanly. -->
+         Declared explicitly so TokenService's import resolves cleanly.
+         Version pinned to match SB 2.7.18 managed transitive (9.22). -->
     <dependency>
       <groupId>com.nimbusds</groupId>
       <artifactId>nimbus-jose-jwt</artifactId>
+      <version>9.22</version>
     </dependency>
     <dependency>
       <groupId>org.springframework.boot</groupId>
