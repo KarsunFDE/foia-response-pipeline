@@ -1,7 +1,7 @@
-package com.karsunfde.foiapipeline.foia_request.service;
+package com.karsunfde.foiapipeline.foiarequest.service;
 
-import com.karsunfde.foiapipeline.foia_request.model.ClauseLibraryEntry;
-import com.karsunfde.foiapipeline.foia_request.repository.ClauseLibraryRepository;
+import com.karsunfde.foiapipeline.foiarequest.model.ClauseLibraryEntry;
+import com.karsunfde.foiapipeline.foiarequest.repository.ClauseLibraryRepository;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 

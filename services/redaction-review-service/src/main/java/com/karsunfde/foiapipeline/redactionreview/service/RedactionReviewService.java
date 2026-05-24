@@ -1,12 +1,12 @@
-package com.karsunfde.foiapipeline.redaction_review.service;
+package com.karsunfde.foiapipeline.redactionreview.service;
 
-import com.karsunfde.foiapipeline.redaction_review.audit.EvalAuditLogger;
-import com.karsunfde.foiapipeline.redaction_review.client.AiOrchestratorClient;
-import com.karsunfde.foiapipeline.redaction_review.client.FoiaRequestClient;
-import com.karsunfde.foiapipeline.redaction_review.model.RedactionReview;
-import com.karsunfde.foiapipeline.redaction_review.model.RedactionReviewScore;
-import com.karsunfde.foiapipeline.redaction_review.repository.RedactionReviewRepository;
-import com.karsunfde.foiapipeline.redaction_review.repository.RedactionReviewScoreRepository;
+import com.karsunfde.foiapipeline.redactionreview.audit.EvalAuditLogger;
+import com.karsunfde.foiapipeline.redactionreview.client.AiOrchestratorClient;
+import com.karsunfde.foiapipeline.redactionreview.client.FoiaRequestClient;
+import com.karsunfde.foiapipeline.redactionreview.model.RedactionReview;
+import com.karsunfde.foiapipeline.redactionreview.model.RedactionReviewScore;
+import com.karsunfde.foiapipeline.redactionreview.repository.RedactionReviewRepository;
+import com.karsunfde.foiapipeline.redactionreview.repository.RedactionReviewScoreRepository;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;

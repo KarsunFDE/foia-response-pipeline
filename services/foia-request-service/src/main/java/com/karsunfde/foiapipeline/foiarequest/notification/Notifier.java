@@ -1,4 +1,4 @@
-package com.karsunfde.foiapipeline.foia_request.notification;
+package com.karsunfde.foiapipeline.foiarequest.notification;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;

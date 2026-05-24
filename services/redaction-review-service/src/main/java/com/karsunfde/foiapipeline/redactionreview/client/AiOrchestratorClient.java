@@ -1,10 +1,11 @@
-package com.karsunfde.foiapipeline.redaction_review.client;
+package com.karsunfde.foiapipeline.redactionreview.client;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
+import org.springframework.web.client.HttpServerErrorException;
 import org.springframework.web.client.RestTemplate;
 
 import java.util.HashMap;
@@ -15,6 +16,12 @@ import java.util.Map;
  *
  * ⚠ Item 3 reinforcement — same RestTemplate, no circuit breaker.
  * ⚠ Item 6 — no correlation-id forwarded.
+ *
+ * ⚠ DELIBERATE PAIR-UNIQUE BROWNFIELD DEBT — rel-retry-without-backoff ⚠
+ * Per D-059 Cohort #1 Pair 3 (foia-response-pipeline). The new {@link #draft(String)}
+ * entry-point retries up to 5 times with NO backoff (thundering-herd antipattern).
+ * Cohort fixes in W5 (AIOps Resilience4j anchor). See
+ * services/foia-response-pipeline/docs/pair-unique-debt.md.
  */
 @Component
 public class AiOrchestratorClient {
@@ -46,5 +53,38 @@ public class AiOrchestratorClient {
         body.put("topic", "factor " + factorId);
         body.put("constraints", proposalText);
         return restTemplate.postForObject(aiUrl + "/eval/factor-suggest", body, Map.class);
+    }
+
+    /**
+     * Calls ai-orchestrator's draft endpoint for a redaction-review narrative.
+     *
+     * <p>⚠ Pair-unique debt rel-retry-without-backoff: retries up to 5 times
+     * with NO backoff. Under a transient 503 from ai-orchestrator (or
+     * upstream Bedrock throttling), this client hammers the AI service 5
+     * times in tight succession from every concurrent request — classic
+     * thundering-herd. FOIA-domain twist: redaction-proposer batches can
+     * fan out hundreds of in-flight reviews simultaneously when an agency
+     * uploads a multi-thousand-page responsive-document set.</p>
+     *
+     * @param input prompt input (typically a ResponsivePages excerpt for
+     *              redaction-proposal)
+     * @return ai-orchestrator response body
+     */
+    @SuppressWarnings("unchecked")
+    public Map<String, Object> draft(String input) {
+        Map<String, Object> body = new HashMap<>();
+        body.put("input", input);
+        // ⚠ pair-unique debt rel-retry-without-backoff:
+        // tight-loop retry with no backoff.
+        RuntimeException last = null;
+        for (int i = 0; i < 5; i++) {
+            try {
+                return restTemplate.postForObject(aiUrl + "/draft", body, Map.class);
+            } catch (HttpServerErrorException e) {
+                last = e;
+                // ⚠ retry immediately, no backoff
+            }
+        }
+        throw new RuntimeException("AI orchestrator failing", last);
     }
 }

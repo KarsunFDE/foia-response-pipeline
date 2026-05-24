@@ -1,4 +1,4 @@
-package com.karsunfde.foiapipeline.redaction_review;
+package com.karsunfde.foiapipeline.redactionreview;
 
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;

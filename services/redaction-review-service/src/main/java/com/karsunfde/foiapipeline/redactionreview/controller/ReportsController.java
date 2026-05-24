@@ -1,11 +1,11 @@
-package com.karsunfde.foiapipeline.redaction_review.controller;
+package com.karsunfde.foiapipeline.redactionreview.controller;
 
-import com.karsunfde.foiapipeline.redaction_review.client.FoiaRequestClient;
-import com.karsunfde.foiapipeline.redaction_review.model.Award;
-import com.karsunfde.foiapipeline.redaction_review.model.ContractModification;
-import com.karsunfde.foiapipeline.redaction_review.model.Cpar;
-import com.karsunfde.foiapipeline.redaction_review.model.Finding;
-import com.karsunfde.foiapipeline.redaction_review.repository.*;
+import com.karsunfde.foiapipeline.redactionreview.client.FoiaRequestClient;
+import com.karsunfde.foiapipeline.redactionreview.model.Award;
+import com.karsunfde.foiapipeline.redactionreview.model.ContractModification;
+import com.karsunfde.foiapipeline.redactionreview.model.Cpar;
+import com.karsunfde.foiapipeline.redactionreview.model.Finding;
+import com.karsunfde.foiapipeline.redactionreview.repository.*;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.*;
 

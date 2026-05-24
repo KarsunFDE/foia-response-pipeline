@@ -1,7 +1,7 @@
-package com.karsunfde.foiapipeline.redaction_review.controller;
+package com.karsunfde.foiapipeline.redactionreview.controller;
 
-import com.karsunfde.foiapipeline.redaction_review.model.Finding;
-import com.karsunfde.foiapipeline.redaction_review.service.FindingService;
+import com.karsunfde.foiapipeline.redactionreview.model.Finding;
+import com.karsunfde.foiapipeline.redactionreview.service.FindingService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.*;
 

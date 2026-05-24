@@ -38,6 +38,25 @@
          resilience4j-spring-boot2 is NOT a dependency (SB 2.7 line).
          Cohort adds in W4 Thu, then migrates to resilience4j-spring-boot3
          as part of the SB 2.7 -> 3.0 hop. -->
+
+    <!-- Pair-unique sec-sql-string-concat-aspect-search uses raw JDBC for a
+         relational search surface alongside the Mongo entity store. JDBC
+         is a legitimate co-existence in federal acquisitions (Postgres for
+         audit + reporting; Mongo for documents). -->
+    <dependency>
+      <groupId>org.springframework.boot</groupId>
+      <artifactId>spring-boot-starter-jdbc</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>com.h2database</groupId>
+      <artifactId>h2</artifactId>
+      <scope>test</scope>
+    </dependency>
+    <dependency>
+      <groupId>org.springframework.boot</groupId>
+      <artifactId>spring-boot-starter-test</artifactId>
+      <scope>test</scope>
+    </dependency>
   </dependencies>
 
   <build>

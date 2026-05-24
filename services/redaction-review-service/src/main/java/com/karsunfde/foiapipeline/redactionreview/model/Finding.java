@@ -1,4 +1,4 @@
-package com.karsunfde.foiapipeline.redaction_review.model;
+package com.karsunfde.foiapipeline.redactionreview.model;
 
 import org.springframework.data.annotation.Id;
 import org.springframework.data.mongodb.core.mapping.Document;

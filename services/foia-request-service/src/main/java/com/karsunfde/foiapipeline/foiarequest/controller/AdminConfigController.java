@@ -1,4 +1,4 @@
-package com.karsunfde.foiapipeline.foia_request.controller;
+package com.karsunfde.foiapipeline.foiarequest.controller;
 
 import org.springframework.web.bind.annotation.*;
 

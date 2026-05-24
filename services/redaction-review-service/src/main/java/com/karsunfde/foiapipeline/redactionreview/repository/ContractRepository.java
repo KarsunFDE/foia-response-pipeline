@@ -1,6 +1,6 @@
-package com.karsunfde.foiapipeline.redaction_review.repository;
+package com.karsunfde.foiapipeline.redactionreview.repository;
 
-import com.karsunfde.foiapipeline.redaction_review.model.Contract;
+import com.karsunfde.foiapipeline.redactionreview.model.Contract;
 import org.springframework.data.mongodb.repository.MongoRepository;
 
 import java.util.List;

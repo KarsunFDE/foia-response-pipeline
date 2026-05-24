@@ -1,4 +1,4 @@
-package com.karsunfde.foiapipeline.foia_request.dto;
+package com.karsunfde.foiapipeline.foiarequest.dto;
 
 /**
  * Agency answer to a vendor question.

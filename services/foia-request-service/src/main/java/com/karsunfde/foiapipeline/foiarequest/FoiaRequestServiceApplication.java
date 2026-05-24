@@ -1,4 +1,4 @@
-package com.karsunfde.foiapipeline.foia_request;
+package com.karsunfde.foiapipeline.foiarequest;
 
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;

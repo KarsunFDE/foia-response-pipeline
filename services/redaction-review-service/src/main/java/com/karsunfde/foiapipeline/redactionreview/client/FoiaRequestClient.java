@@ -1,4 +1,4 @@
-package com.karsunfde.foiapipeline.redaction_review.client;
+package com.karsunfde.foiapipeline.redactionreview.client;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;

@@ -1,7 +1,7 @@
-package com.karsunfde.foiapipeline.foia_request.controller;
+package com.karsunfde.foiapipeline.foiarequest.controller;
 
-import com.karsunfde.foiapipeline.foia_request.model.User;
-import com.karsunfde.foiapipeline.foia_request.service.UserService;
+import com.karsunfde.foiapipeline.foiarequest.model.User;
+import com.karsunfde.foiapipeline.foiarequest.service.UserService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;

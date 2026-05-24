@@ -1,4 +1,4 @@
-package com.karsunfde.foiapipeline.foia_request.model;
+package com.karsunfde.foiapipeline.foiarequest.model;
 
 import org.springframework.data.annotation.Id;
 import org.springframework.data.mongodb.core.mapping.Document;
@@ -15,7 +15,7 @@ import java.util.List;
  * SAM.gov registration model).
  *
  * ⚠ Item 10 reinforcement — {@code agencyVisibility} list exists but list
- * endpoints don't filter on it (see {@link com.karsunfde.foiapipeline.foia_request.repository.VendorRepository}).
+ * endpoints don't filter on it (see {@link com.karsunfde.foiapipeline.foiarequest.repository.VendorRepository}).
  */
 @Document(collection = "vendors")
 public class Vendor {

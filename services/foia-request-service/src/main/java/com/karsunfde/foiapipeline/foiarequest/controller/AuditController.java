@@ -1,7 +1,7 @@
-package com.karsunfde.foiapipeline.foia_request.controller;
+package com.karsunfde.foiapipeline.foiarequest.controller;
 
-import com.karsunfde.foiapipeline.foia_request.model.AuditEvent;
-import com.karsunfde.foiapipeline.foia_request.service.AuditSearchService;
+import com.karsunfde.foiapipeline.foiarequest.model.AuditEvent;
+import com.karsunfde.foiapipeline.foiarequest.service.AuditSearchService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;

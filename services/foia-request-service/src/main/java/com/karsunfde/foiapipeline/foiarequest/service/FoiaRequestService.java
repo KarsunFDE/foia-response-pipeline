@@ -1,9 +1,9 @@
-package com.karsunfde.foiapipeline.foia_request.service;
+package com.karsunfde.foiapipeline.foiarequest.service;
 
-import com.karsunfde.foiapipeline.foia_request.audit.AuditLogger;
-import com.karsunfde.foiapipeline.foia_request.dto.FoiaRequestCreateRequest;
-import com.karsunfde.foiapipeline.foia_request.model.FoiaRequest;
-import com.karsunfde.foiapipeline.foia_request.repository.FoiaRequestRepository;
+import com.karsunfde.foiapipeline.foiarequest.audit.AuditLogger;
+import com.karsunfde.foiapipeline.foiarequest.dto.FoiaRequestCreateRequest;
+import com.karsunfde.foiapipeline.foiarequest.model.FoiaRequest;
+import com.karsunfde.foiapipeline.foiarequest.repository.FoiaRequestRepository;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;

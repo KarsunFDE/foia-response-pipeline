@@ -1,9 +1,9 @@
-package com.karsunfde.foiapipeline.foia_request.controller;
+package com.karsunfde.foiapipeline.foiarequest.controller;
 
-import com.karsunfde.foiapipeline.foia_request.model.Proposal;
-import com.karsunfde.foiapipeline.foia_request.model.Vendor;
-import com.karsunfde.foiapipeline.foia_request.service.ProposalService;
-import com.karsunfde.foiapipeline.foia_request.service.VendorService;
+import com.karsunfde.foiapipeline.foiarequest.model.Proposal;
+import com.karsunfde.foiapipeline.foiarequest.model.Vendor;
+import com.karsunfde.foiapipeline.foiarequest.service.ProposalService;
+import com.karsunfde.foiapipeline.foiarequest.service.VendorService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;

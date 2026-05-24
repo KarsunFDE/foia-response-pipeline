@@ -1,8 +1,8 @@
-package com.karsunfde.foiapipeline.foia_request;
+package com.karsunfde.foiapipeline.foiarequest;
 
-import com.karsunfde.foiapipeline.foia_request.audit.AuditLogger;
-import com.karsunfde.foiapipeline.foia_request.repository.FoiaRequestRepository;
-import com.karsunfde.foiapipeline.foia_request.service.FoiaRequestService;
+import com.karsunfde.foiapipeline.foiarequest.audit.AuditLogger;
+import com.karsunfde.foiapipeline.foiarequest.repository.FoiaRequestRepository;
+import com.karsunfde.foiapipeline.foiarequest.service.FoiaRequestService;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 

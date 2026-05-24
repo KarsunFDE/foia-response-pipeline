@@ -1,7 +1,7 @@
-package com.karsunfde.foiapipeline.foia_request.service;
+package com.karsunfde.foiapipeline.foiarequest.service;
 
-import com.karsunfde.foiapipeline.foia_request.model.AuditEvent;
-import com.karsunfde.foiapipeline.foia_request.repository.AuditEventRepository;
+import com.karsunfde.foiapipeline.foiarequest.model.AuditEvent;
+import com.karsunfde.foiapipeline.foiarequest.repository.AuditEventRepository;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 

@@ -1,12 +1,12 @@
-package com.karsunfde.foiapipeline.redaction_review.service;
+package com.karsunfde.foiapipeline.redactionreview.service;
 
-import com.karsunfde.foiapipeline.redaction_review.audit.EvalAuditLogger;
-import com.karsunfde.foiapipeline.redaction_review.model.Award;
-import com.karsunfde.foiapipeline.redaction_review.model.DebriefRequest;
-import com.karsunfde.foiapipeline.redaction_review.model.RedactionReview;
-import com.karsunfde.foiapipeline.redaction_review.repository.AwardRepository;
-import com.karsunfde.foiapipeline.redaction_review.repository.DebriefRequestRepository;
-import com.karsunfde.foiapipeline.redaction_review.repository.RedactionReviewRepository;
+import com.karsunfde.foiapipeline.redactionreview.audit.EvalAuditLogger;
+import com.karsunfde.foiapipeline.redactionreview.model.Award;
+import com.karsunfde.foiapipeline.redactionreview.model.DebriefRequest;
+import com.karsunfde.foiapipeline.redactionreview.model.RedactionReview;
+import com.karsunfde.foiapipeline.redactionreview.repository.AwardRepository;
+import com.karsunfde.foiapipeline.redactionreview.repository.DebriefRequestRepository;
+import com.karsunfde.foiapipeline.redactionreview.repository.RedactionReviewRepository;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 

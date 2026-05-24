@@ -1,4 +1,4 @@
-package com.karsunfde.foiapipeline.foia_request.model;
+package com.karsunfde.foiapipeline.foiarequest.model;
 
 import org.springframework.data.annotation.Id;
 import org.springframework.data.mongodb.core.mapping.Document;

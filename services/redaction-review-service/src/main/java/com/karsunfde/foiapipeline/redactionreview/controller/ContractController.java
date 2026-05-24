@@ -1,8 +1,8 @@
-package com.karsunfde.foiapipeline.redaction_review.controller;
+package com.karsunfde.foiapipeline.redactionreview.controller;
 
-import com.karsunfde.foiapipeline.redaction_review.model.*;
-import com.karsunfde.foiapipeline.redaction_review.service.ContractService;
-import com.karsunfde.foiapipeline.redaction_review.service.CparService;
+import com.karsunfde.foiapipeline.redactionreview.model.*;
+import com.karsunfde.foiapipeline.redactionreview.service.ContractService;
+import com.karsunfde.foiapipeline.redactionreview.service.CparService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;

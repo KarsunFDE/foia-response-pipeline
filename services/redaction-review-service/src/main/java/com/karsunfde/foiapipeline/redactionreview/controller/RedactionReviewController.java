@@ -1,9 +1,9 @@
-package com.karsunfde.foiapipeline.redaction_review.controller;
+package com.karsunfde.foiapipeline.redactionreview.controller;
 
-import com.karsunfde.foiapipeline.redaction_review.client.FoiaRequestClient;
-import com.karsunfde.foiapipeline.redaction_review.model.RedactionReview;
-import com.karsunfde.foiapipeline.redaction_review.model.RedactionReviewScore;
-import com.karsunfde.foiapipeline.redaction_review.service.RedactionReviewService;
+import com.karsunfde.foiapipeline.redactionreview.client.FoiaRequestClient;
+import com.karsunfde.foiapipeline.redactionreview.model.RedactionReview;
+import com.karsunfde.foiapipeline.redactionreview.model.RedactionReviewScore;
+import com.karsunfde.foiapipeline.redactionreview.service.RedactionReviewService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;

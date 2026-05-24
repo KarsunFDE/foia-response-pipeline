@@ -1,8 +1,8 @@
-package com.karsunfde.foiapipeline.redaction_review.controller;
+package com.karsunfde.foiapipeline.redactionreview.controller;
 
-import com.karsunfde.foiapipeline.redaction_review.model.Award;
-import com.karsunfde.foiapipeline.redaction_review.model.DebriefRequest;
-import com.karsunfde.foiapipeline.redaction_review.service.AwardService;
+import com.karsunfde.foiapipeline.redactionreview.model.Award;
+import com.karsunfde.foiapipeline.redactionreview.model.DebriefRequest;
+import com.karsunfde.foiapipeline.redactionreview.service.AwardService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;

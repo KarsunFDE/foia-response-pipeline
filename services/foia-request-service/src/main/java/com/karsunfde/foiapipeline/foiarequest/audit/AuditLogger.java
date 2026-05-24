@@ -1,7 +1,7 @@
-package com.karsunfde.foiapipeline.foia_request.audit;
+package com.karsunfde.foiapipeline.foiarequest.audit;
 
-import com.karsunfde.foiapipeline.foia_request.model.AuditEvent;
-import com.karsunfde.foiapipeline.foia_request.repository.AuditEventRepository;
+import com.karsunfde.foiapipeline.foiarequest.model.AuditEvent;
+import com.karsunfde.foiapipeline.foiarequest.repository.AuditEventRepository;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;

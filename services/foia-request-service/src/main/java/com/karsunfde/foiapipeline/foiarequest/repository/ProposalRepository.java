@@ -1,6 +1,6 @@
-package com.karsunfde.foiapipeline.foia_request.repository;
+package com.karsunfde.foiapipeline.foiarequest.repository;
 
-import com.karsunfde.foiapipeline.foia_request.model.Proposal;
+import com.karsunfde.foiapipeline.foiarequest.model.Proposal;
 import org.springframework.data.mongodb.repository.MongoRepository;
 
 import java.util.List;
