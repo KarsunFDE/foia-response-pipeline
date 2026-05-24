@@ -2,11 +2,11 @@ import { Component } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { Router } from '@angular/router';
-import { FoiaRequestService } from '../../services/foia_request.service';
-import { FoiaRequestCreate } from '../../models/foia_request';
+import { FoiaRequestService } from '../../services/foia-request.service';
+import { FoiaRequestCreate } from '../../models/foia-request';
 
 /**
- * New-foia_request form.
+ * New-foiaRequest form.
  *
  * ⚠ DELIBERATE — Item 8 reinforcement / Item 9 reinforcement:
  *   - The `description` textarea has NO maxlength, NO required validator,
@@ -16,11 +16,11 @@ import { FoiaRequestCreate } from '../../models/foia_request';
  *     authorized agencies.
  */
 @Component({
-  selector: 'app-foia_request-create',
+  selector: 'app-foiaRequest-create',
   standalone: true,
   imports: [CommonModule, FormsModule],
   template: `
-    <h2>New foia_request</h2>
+    <h2>New foiaRequest</h2>
     <form (ngSubmit)="onSubmit()" #form="ngForm">
       <p>
         <label>Title<br>
@@ -67,7 +67,7 @@ export class FoiaRequestCreateComponent {
     this.svc.create(this.model).subscribe({
       next: () => {
         this.submitting = false;
-        this.router.navigate(['/foia_requests']);
+        this.router.navigate(['/foiaRequests']);
       },
       error: (err) => {
         this.error = `Create failed: ${err.message ?? err}`;

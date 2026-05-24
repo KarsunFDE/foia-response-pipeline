@@ -46,11 +46,11 @@ class SqlStringConcatSearchDebtTest {
             .generateUniqueName(true)
             .build();
         JdbcTemplate jdbc = new JdbcTemplate(db);
-        jdbc.execute("CREATE TABLE foia_requests (id VARCHAR(64) PRIMARY KEY, status VARCHAR(32))");
-        jdbc.update("INSERT INTO foia_requests(id, status) VALUES (?, ?)", "r-1", "PROPOSED");
-        jdbc.update("INSERT INTO foia_requests(id, status) VALUES (?, ?)", "r-2", "UNDER_REVIEW");
-        jdbc.update("INSERT INTO foia_requests(id, status) VALUES (?, ?)", "r-3", "APPROVED_FOR_RELEASE");
-        jdbc.update("INSERT INTO foia_requests(id, status) VALUES (?, ?)", "r-4", "WITHHELD");
+        jdbc.execute("CREATE TABLE foiaRequests (id VARCHAR(64) PRIMARY KEY, status VARCHAR(32))");
+        jdbc.update("INSERT INTO foiaRequests(id, status) VALUES (?, ?)", "r-1", "PROPOSED");
+        jdbc.update("INSERT INTO foiaRequests(id, status) VALUES (?, ?)", "r-2", "UNDER_REVIEW");
+        jdbc.update("INSERT INTO foiaRequests(id, status) VALUES (?, ?)", "r-3", "APPROVED_FOR_RELEASE");
+        jdbc.update("INSERT INTO foiaRequests(id, status) VALUES (?, ?)", "r-4", "WITHHELD");
         repo = new SearchRepository(jdbc);
     }
 
@@ -66,7 +66,7 @@ class SqlStringConcatSearchDebtTest {
             .as("Pair-unique debt sec-sql-string-concat-aspect-search: "
                 + "searchByStatus must use parameterized SQL. Currently the "
                 + "raw concat lets `' OR '1'='1` enumerate every row in "
-                + "foia_requests — bypasses the Mongo-side per-requester ACL. "
+                + "foiaRequests — bypasses the Mongo-side per-requester ACL. "
                 + "Fix lands W4 (OWASP A03 Injection).")
             .isLessThan(total);
     }

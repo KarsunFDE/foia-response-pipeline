@@ -41,13 +41,13 @@ public class ProposalService {
         this.auditLogger = auditLogger;
     }
 
-    public Optional<Proposal> submit(String foia_requestId, ProposalSubmitRequest req, String actor) {
-        Optional<FoiaRequest> solOpt = solRepo.findById(foia_requestId);
+    public Optional<Proposal> submit(String foiaRequestId, ProposalSubmitRequest req, String actor) {
+        Optional<FoiaRequest> solOpt = solRepo.findById(foiaRequestId);
         if (solOpt.isEmpty()) return Optional.empty();
         FoiaRequest sol = solOpt.get();
 
         Proposal p = new Proposal();
-        p.setFoiaRequestId(foia_requestId);
+        p.setFoiaRequestId(foiaRequestId);
         p.setAgencyId(sol.getAgencyId());
         p.setVendorId(req.getVendorId());
         p.setVolumes(req.getVolumes());
@@ -61,8 +61,8 @@ public class ProposalService {
         auditLogger.recordAsync("PROPOSAL_SUBMIT", "proposal", saved.getId(),
             actor, sol.getAgencyId());
 
-        log.info("proposal submitted foia_requestId={} vendorId={}",
-            foia_requestId, req.getVendorId());
+        log.info("proposal submitted foiaRequestId={} vendorId={}",
+            foiaRequestId, req.getVendorId());
         return Optional.of(saved);
     }
 
@@ -83,9 +83,9 @@ public class ProposalService {
         });
     }
 
-    public List<Proposal> listForFoiaRequest(String foia_requestId) {
+    public List<Proposal> listForFoiaRequest(String foiaRequestId) {
         // ⚠ Item 10 — should re-check the caller's agency.
-        return repo.findByFoiaRequestId(foia_requestId);
+        return repo.findByFoiaRequestId(foiaRequestId);
     }
 
     public List<Proposal> listForVendor(String vendorId) {

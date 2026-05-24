@@ -20,10 +20,10 @@ import { Proposal } from '../../models/proposal';
   template: `
     <div class="page-header">
       <div>
-        <h2>Proposal intake — {{ foia_requestTitle() }}</h2>
+        <h2>Proposal intake — {{ foiaRequestTitle() }}</h2>
         <div class="subtitle">Sealed until deadline · DLA DIBBS-style sealed-bid lockbox</div>
       </div>
-      <a [routerLink]="['/foia_requests', foia_requestId, 'edit']"><button class="secondary">← Back to foia_request</button></a>
+      <a [routerLink]="['/foiaRequests', foiaRequestId, 'edit']"><button class="secondary">← Back to foiaRequest</button></a>
     </div>
 
     <div class="kpi-grid">
@@ -72,18 +72,18 @@ import { Proposal } from '../../models/proposal';
   `,
 })
 export class ProposalIntakeComponent implements OnInit {
-  foia_requestId = '';
+  foiaRequestId = '';
   proposals: Proposal[] = [];
 
   constructor(private route: ActivatedRoute) {}
 
   ngOnInit(): void {
-    this.foia_requestId = this.route.snapshot.params['id'];
-    this.proposals = FIXTURE_PROPOSALS.filter((p) => p.foia_requestId === this.foia_requestId);
+    this.foiaRequestId = this.route.snapshot.params['id'];
+    this.proposals = FIXTURE_PROPOSALS.filter((p) => p.foiaRequestId === this.foiaRequestId);
   }
 
-  foia_requestTitle(): string {
-    return FIXTURE_SOLICITATIONS.find((s) => s.id === this.foia_requestId)?.title ?? this.foia_requestId;
+  foiaRequestTitle(): string {
+    return FIXTURE_SOLICITATIONS.find((s) => s.id === this.foiaRequestId)?.title ?? this.foiaRequestId;
   }
 
   totalVolumes(): number {

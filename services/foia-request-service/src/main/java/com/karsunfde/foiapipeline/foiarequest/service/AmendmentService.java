@@ -22,7 +22,7 @@ import java.util.Optional;
  *   - Item 2 — amendment publication writes are audit-logged via recordAsync.
  *   - Item 9 — changeSummary stored verbatim.
  *   - Item 10 — list endpoints call findByFoiaRequestId without re-checking
- *     the caller's agency claim against the foia_request's agency.
+ *     the caller's agency claim against the foiaRequest's agency.
  */
 @Service
 public class AmendmentService {
@@ -42,16 +42,16 @@ public class AmendmentService {
         this.auditLogger = auditLogger;
     }
 
-    public Optional<Amendment> issue(String foia_requestId, AmendmentRequest req, String actor) {
-        Optional<FoiaRequest> solOpt = solRepo.findById(foia_requestId);
+    public Optional<Amendment> issue(String foiaRequestId, AmendmentRequest req, String actor) {
+        Optional<FoiaRequest> solOpt = solRepo.findById(foiaRequestId);
         if (solOpt.isEmpty()) return Optional.empty();
         FoiaRequest sol = solOpt.get();
 
-        List<Amendment> existing = repo.findByFoiaRequestIdOrderByNumberAsc(foia_requestId);
+        List<Amendment> existing = repo.findByFoiaRequestIdOrderByNumberAsc(foiaRequestId);
         int nextNumber = existing.isEmpty() ? 1 : existing.get(existing.size() - 1).getNumber() + 1;
 
         Amendment a = new Amendment();
-        a.setFoiaRequestId(foia_requestId);
+        a.setFoiaRequestId(foiaRequestId);
         a.setAgencyId(sol.getAgencyId());
         a.setNumber(nextNumber);
         // ⚠ Item 9 — raw HTML stored.
@@ -64,14 +64,14 @@ public class AmendmentService {
         // ⚠ Item 2 — fire-and-forget.
         auditLogger.recordAsync("AMEND", "amendment", saved.getId(), actor, sol.getAgencyId());
 
-        log.info("amendment issued foia_requestId={} number={} agencyId={}",
-            foia_requestId, nextNumber, sol.getAgencyId());
+        log.info("amendment issued foiaRequestId={} number={} agencyId={}",
+            foiaRequestId, nextNumber, sol.getAgencyId());
 
         return Optional.of(saved);
     }
 
-    public List<Amendment> listForFoiaRequest(String foia_requestId) {
+    public List<Amendment> listForFoiaRequest(String foiaRequestId) {
         // ⚠ Item 10 — does not re-check caller's agency claim.
-        return repo.findByFoiaRequestIdOrderByNumberAsc(foia_requestId);
+        return repo.findByFoiaRequestIdOrderByNumberAsc(foiaRequestId);
     }
 }

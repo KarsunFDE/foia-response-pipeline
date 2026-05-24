@@ -24,22 +24,22 @@ const NAV: NavGroup[] = [
     title: 'Workspace',
     links: [
       { label: 'Officer Dashboard', route: '/dashboard', roles: ['contracting_officer', 'contract_specialist', 'program_manager', 'ssa'] },
-      { label: 'Evaluator Workspace', route: '/redaction_review/workspace', roles: ['evaluator', 'contracting_officer'] },
+      { label: 'Evaluator Workspace', route: '/redactionReview/workspace', roles: ['evaluator', 'contracting_officer'] },
       { label: 'Vendor Portal', route: '/vendor/proposals', roles: ['vendor'] },
     ],
   },
   {
     title: 'FoiaRequests',
     links: [
-      { label: 'FoiaRequests Index', route: '/foia_requests', roles: ['contracting_officer', 'contract_specialist', 'program_manager'] },
-      { label: 'New FoiaRequest', route: '/foia_requests/new', roles: ['contracting_officer', 'contract_specialist'] },
+      { label: 'FoiaRequests Index', route: '/foiaRequests', roles: ['contracting_officer', 'contract_specialist', 'program_manager'] },
+      { label: 'New FoiaRequest', route: '/foiaRequests/new', roles: ['contracting_officer', 'contract_specialist'] },
       { label: 'Public Opportunity Search', route: '/public/opportunities', roles: [] },
     ],
   },
   {
     title: 'Source Selection',
     links: [
-      { label: 'Consensus + SSDD', route: '/redaction_review/eval-0142/consensus', roles: ['ssa', 'contracting_officer'] },
+      { label: 'Consensus + SSDD', route: '/redactionReview/eval-0142/consensus', roles: ['ssa', 'contracting_officer'] },
     ],
   },
   {

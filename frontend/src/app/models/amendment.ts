@@ -1,13 +1,13 @@
 /**
- * Amendment to a published foia_request (FAR 15.206).
+ * Amendment to a published foiaRequest (FAR 15.206).
  *
- * Numbered sequentially per foia_request. Issuance is restricted to CO.
+ * Numbered sequentially per foiaRequest. Issuance is restricted to CO.
  * Vendors with proposals-in-progress must acknowledge before deadline;
  * acknowledgement state is tracked here.
  */
 export interface Amendment {
   id: string;
-  foia_requestId: string;
+  foiaRequestId: string;
   number: number;                  // 0001, 0002, ...
   changeSummary: string;
   effectiveAt: string;             // ISO

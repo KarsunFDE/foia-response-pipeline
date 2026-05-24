@@ -34,7 +34,7 @@ export type RedactionReviewState =
 
 export interface RedactionReview {
   id: string;
-  foia_requestId: string;
+  foiaRequestId: string;
   panelMembers: string[];          // evaluator user IDs
   factors: RedactionReviewFactor[];
   state: RedactionReviewState;

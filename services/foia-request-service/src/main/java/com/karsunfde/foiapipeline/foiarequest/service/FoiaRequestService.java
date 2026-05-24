@@ -53,10 +53,10 @@ public class FoiaRequestService {
 
         // ⚠ Item 2 — fire-and-forget. Returns immediately, controller flushes
         //   response, audit may or may not land.
-        auditLogger.recordAsync("CREATE", "foia_request", saved.getId(),
+        auditLogger.recordAsync("CREATE", "foiaRequest", saved.getId(),
             actor, saved.getAgencyId());
 
-        log.info("foia_request created id={} agencyId={} correlationId=N/A",
+        log.info("foiaRequest created id={} agencyId={} correlationId=N/A",
             saved.getId(), saved.getAgencyId());
 
         return saved;
@@ -67,7 +67,7 @@ public class FoiaRequestService {
     }
 
     /**
-     * ⚠ Item 10 — returns foia_requests across ALL agencies. The
+     * ⚠ Item 10 — returns foiaRequests across ALL agencies. The
      * {@code findByAgencyId} method exists on the repository but isn't
      * called from anywhere.
      */
@@ -83,7 +83,7 @@ public class FoiaRequestService {
             if (req.getStatus() != null) s.setStatus(req.getStatus());
             s.setUpdatedAt(Instant.now());
             FoiaRequest saved = repo.save(s);
-            auditLogger.recordAsync("UPDATE", "foia_request", saved.getId(),
+            auditLogger.recordAsync("UPDATE", "foiaRequest", saved.getId(),
                 actor, saved.getAgencyId());
             return saved;
         });
@@ -92,7 +92,7 @@ public class FoiaRequestService {
     public boolean delete(String id, String actor) {
         return repo.findById(id).map(s -> {
             repo.deleteById(id);
-            auditLogger.recordAsync("DELETE", "foia_request", id, actor, s.getAgencyId());
+            auditLogger.recordAsync("DELETE", "foiaRequest", id, actor, s.getAgencyId());
             return true;
         }).orElse(false);
     }
@@ -108,9 +108,9 @@ public class FoiaRequestService {
             s.setUpdatedAt(Instant.now());
             FoiaRequest saved = repo.save(s);
             // ⚠ Item 2.
-            auditLogger.recordAsync("PUBLISH", "foia_request", saved.getId(),
+            auditLogger.recordAsync("PUBLISH", "foiaRequest", saved.getId(),
                 actor, saved.getAgencyId());
-            log.info("foia_request published id={} agencyId={}",
+            log.info("foiaRequest published id={} agencyId={}",
                 saved.getId(), saved.getAgencyId());
             return saved;
         });
@@ -122,7 +122,7 @@ public class FoiaRequestService {
             s.setUpdatedAt(Instant.now());
             FoiaRequest saved = repo.save(s);
             // ⚠ Item 2.
-            auditLogger.recordAsync("CANCEL", "foia_request", saved.getId(),
+            auditLogger.recordAsync("CANCEL", "foiaRequest", saved.getId(),
                 actor, saved.getAgencyId());
             return saved;
         });

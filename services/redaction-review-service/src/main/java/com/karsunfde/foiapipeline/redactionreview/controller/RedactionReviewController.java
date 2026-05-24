@@ -25,38 +25,38 @@ import java.util.Map;
  * ⚠ DELIBERATE — Item 3 reinforcement:
  *   POST /api/redaction-reviews is a state-mutating endpoint that does NOT accept
  *   or honour an Idempotency-Key header. A retry from the client creates
- *   duplicate redaction_reviews.
+ *   duplicate redactionReviews.
  */
 @RestController
 @RequestMapping("/api/redaction-reviews")
 public class RedactionReviewController {
 
-    private final FoiaRequestClient foia_requestClient;
+    private final FoiaRequestClient foiaRequestClient;
     private final RedactionReviewService svc;
 
     @Autowired
-    public RedactionReviewController(FoiaRequestClient foia_requestClient, RedactionReviewService svc) {
-        this.foia_requestClient = foia_requestClient;
+    public RedactionReviewController(FoiaRequestClient foiaRequestClient, RedactionReviewService svc) {
+        this.foiaRequestClient = foiaRequestClient;
         this.svc = svc;
     }
 
-    /** Fetch the foia_request snapshot the redaction_review panel is reviewing. */
-    @GetMapping("/{redaction_reviewId}/foia_request/{foia_requestId}")
+    /** Fetch the foiaRequest snapshot the redactionReview panel is reviewing. */
+    @GetMapping("/{redactionReviewId}/foiaRequest/{foiaRequestId}")
     public ResponseEntity<Map<String, Object>> getFoiaRequestForRedactionReview(
-            @PathVariable String redaction_reviewId,
-            @PathVariable String foia_requestId) {
+            @PathVariable String redactionReviewId,
+            @PathVariable String foiaRequestId) {
         // ⚠ Item 3 — no circuit breaker on this hop.
-        Map<String, Object> sol = foia_requestClient.getFoiaRequest(foia_requestId);
+        Map<String, Object> sol = foiaRequestClient.getFoiaRequest(foiaRequestId);
         return ResponseEntity.ok(sol);
     }
 
-    /** Create a new redaction_review panel. ⚠ Item 3 — no idempotency key. */
+    /** Create a new redactionReview panel. ⚠ Item 3 — no idempotency key. */
     @PostMapping
     public ResponseEntity<RedactionReview> create(@RequestBody Map<String, Object> req,
                                               @RequestHeader(value = "X-User", defaultValue = "anonymous") String actor) {
-        String foia_requestId = String.valueOf(req.get("foia_requestId"));
+        String foiaRequestId = String.valueOf(req.get("foiaRequestId"));
         String agencyId = (String) req.getOrDefault("agencyId", "GSA-FAS");
-        return ResponseEntity.ok(svc.create(foia_requestId, agencyId, actor));
+        return ResponseEntity.ok(svc.create(foiaRequestId, agencyId, actor));
     }
 
     @GetMapping("/{id}")

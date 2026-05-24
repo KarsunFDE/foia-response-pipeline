@@ -41,13 +41,13 @@ public class QnaService {
         this.auditLogger = auditLogger;
     }
 
-    public Optional<Qna> submit(String foia_requestId, QnaRequest req, String actor) {
-        Optional<FoiaRequest> solOpt = solRepo.findById(foia_requestId);
+    public Optional<Qna> submit(String foiaRequestId, QnaRequest req, String actor) {
+        Optional<FoiaRequest> solOpt = solRepo.findById(foiaRequestId);
         if (solOpt.isEmpty()) return Optional.empty();
         FoiaRequest sol = solOpt.get();
 
         Qna q = new Qna();
-        q.setFoiaRequestId(foia_requestId);
+        q.setFoiaRequestId(foiaRequestId);
         q.setAgencyId(sol.getAgencyId());
         // ⚠ Item 9 — raw HTML accepted.
         q.setQuestion(req.getQuestion());
@@ -59,7 +59,7 @@ public class QnaService {
         // ⚠ Item 2 — fire-and-forget.
         auditLogger.recordAsync("QNA_SUBMIT", "qna", saved.getId(), actor, sol.getAgencyId());
 
-        log.info("qna submitted foia_requestId={} vendorId={}", foia_requestId, req.getVendorId());
+        log.info("qna submitted foiaRequestId={} vendorId={}", foiaRequestId, req.getVendorId());
         return Optional.of(saved);
     }
 
@@ -76,8 +76,8 @@ public class QnaService {
         });
     }
 
-    public List<Qna> listForFoiaRequest(String foia_requestId) {
+    public List<Qna> listForFoiaRequest(String foiaRequestId) {
         // ⚠ Item 10 — does not re-check caller agency.
-        return repo.findByFoiaRequestId(foia_requestId);
+        return repo.findByFoiaRequestId(foiaRequestId);
     }
 }

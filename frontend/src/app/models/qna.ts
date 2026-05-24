@@ -1,5 +1,5 @@
 /**
- * Vendor Q&A on a foia_request.
+ * Vendor Q&A on a foiaRequest.
  *
  * Vendor question → CS triage → CS drafts answer (AI-assisted via
  * `POST /answer-qa`) → CO approves → published to all registered
@@ -7,7 +7,7 @@
  */
 export interface Qna {
   id: string;
-  foia_requestId: string;
+  foiaRequestId: string;
   question: string;
   answer: string | null;
   vendorId: string;                // redacted on publish

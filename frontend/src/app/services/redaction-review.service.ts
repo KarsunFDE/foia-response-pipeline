@@ -2,7 +2,7 @@ import { Injectable } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { Observable } from 'rxjs';
 import { environment } from '../../environments/environment';
-import { RedactionReview, RedactionReviewScore } from '../models/redaction_review';
+import { RedactionReview, RedactionReviewScore } from '../models/redaction-review';
 
 @Injectable({ providedIn: 'root' })
 export class RedactionReviewService {
@@ -37,7 +37,7 @@ export class RedactionReviewService {
   draftSsdd(id: string): Observable<{ narrative: string; correlationId: string }> {
     return this.http.post<{ narrative: string; correlationId: string }>(
       `${environment.apiGatewayUrl}/api/ai/eval/ssdd-draft`,
-      { redaction_reviewId: id },
+      { redactionReviewId: id },
     );
   }
 }

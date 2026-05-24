@@ -4,7 +4,7 @@ import { HttpClient } from '@angular/common/http';
 import { environment } from '../../../environments/environment';
 
 @Component({
-  selector: 'app-redaction_review-panel',
+  selector: 'app-redactionReview-panel',
   standalone: true,
   imports: [CommonModule],
   template: `
@@ -15,7 +15,7 @@ import { environment } from '../../../environments/environment';
         coordination + HITL interrupt nodes.
       </em>
     </p>
-    <button (click)="createPanel()">Create stub redaction_review panel</button>
+    <button (click)="createPanel()">Create stub redactionReview panel</button>
     <pre *ngIf="result">{{ result | json }}</pre>
     <p *ngIf="error" style="color: crimson">{{ error }}</p>
   `,
@@ -30,7 +30,7 @@ export class RedactionReviewPanelComponent {
     this.error = null;
     this.http
       .post(`${environment.apiGatewayUrl}/api/redaction-reviews`, {
-        foia_requestId: 'stub-foia_request-id',
+        foiaRequestId: 'stub-foiaRequest-id',
       })
       .subscribe({
         next: (r) => (this.result = r),

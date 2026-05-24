@@ -6,9 +6,9 @@ import org.springframework.data.mongodb.core.mapping.Document;
 import java.time.Instant;
 
 /**
- * Amendment to a published foia_request. FAR 15.206.
+ * Amendment to a published foiaRequest. FAR 15.206.
  *
- * Amendments are numbered sequentially per foia_request (0001, 0002, ...).
+ * Amendments are numbered sequentially per foiaRequest (0001, 0002, ...).
  * Vendors with proposals-in-progress must acknowledge before deadline.
  *
  * ⚠ Item 9 — {@code changeSummary} is raw HTML, fed into ai-orchestrator
@@ -21,7 +21,7 @@ public class Amendment {
     @Id
     private String id;
 
-    private String foia_requestId;
+    private String foiaRequestId;
     private String agencyId;
     private int number;
 
@@ -36,8 +36,8 @@ public class Amendment {
 
     public String getId() { return id; }
     public void setId(String id) { this.id = id; }
-    public String getFoiaRequestId() { return foia_requestId; }
-    public void setFoiaRequestId(String foia_requestId) { this.foia_requestId = foia_requestId; }
+    public String getFoiaRequestId() { return foiaRequestId; }
+    public void setFoiaRequestId(String foiaRequestId) { this.foiaRequestId = foiaRequestId; }
     public String getAgencyId() { return agencyId; }
     public void setAgencyId(String agencyId) { this.agencyId = agencyId; }
     public int getNumber() { return number; }

@@ -6,7 +6,7 @@ import org.springframework.boot.autoconfigure.SpringBootApplication;
 /**
  * foia-response-pipeline — FoiaRequest Service.
  *
- * FAR/DFARS foia_request lifecycle. CRUD over MongoDB; audit-log writes to
+ * FAR/DFARS foiaRequest lifecycle. CRUD over MongoDB; audit-log writes to
  * an audit collection (deliberately written *after* response — see Item 2).
  *
  * DELIBERATE BROWNFIELD DEBT in this service:

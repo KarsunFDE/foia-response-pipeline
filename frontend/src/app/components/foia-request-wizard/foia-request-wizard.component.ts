@@ -2,8 +2,8 @@ import { Component } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { Router } from '@angular/router';
-import { FoiaRequestService } from '../../services/foia_request.service';
-import { FoiaRequest, FoiaRequestCreate, FoiaRequestSections } from '../../models/foia_request';
+import { FoiaRequestService } from '../../services/foia-request.service';
+import { FoiaRequest, FoiaRequestCreate, FoiaRequestSections } from '../../models/foia-request';
 
 /**
  * Multi-step FoiaRequest Drafting Wizard.
@@ -20,13 +20,13 @@ import { FoiaRequest, FoiaRequestCreate, FoiaRequestSections } from '../../model
  * sanitization on description field).
  */
 @Component({
-  selector: 'app-foia_request-wizard',
+  selector: 'app-foiaRequest-wizard',
   standalone: true,
   imports: [CommonModule, FormsModule],
   template: `
     <div class="page-header">
       <div>
-        <h2>New foia_request — drafting wizard</h2>
+        <h2>New foiaRequest — drafting wizard</h2>
         <div class="subtitle">FAR 15.204 Sections A–M · AI-assisted</div>
       </div>
     </div>
@@ -84,7 +84,7 @@ import { FoiaRequest, FoiaRequestCreate, FoiaRequestSections } from '../../model
       </div>
       <label><span class="label-text">Description (public-facing)</span>
         <textarea name="description" rows="4" [(ngModel)]="model.description"
-                  placeholder="Public foia_request description (rendered raw — see Debt Item 9)"></textarea>
+                  placeholder="Public foiaRequest description (rendered raw — see Debt Item 9)"></textarea>
       </label>
     </div>
 
@@ -124,7 +124,7 @@ import { FoiaRequest, FoiaRequestCreate, FoiaRequestSections } from '../../model
     <!-- Step 5: Review -->
     <div class="card" *ngIf="step === 4">
       <h3>5. Review &amp; submit for internal review</h3>
-      <p>Submitting transitions the foia_request to <code>INTERNAL_REVIEW</code>.
+      <p>Submitting transitions the foiaRequest to <code>INTERNAL_REVIEW</code>.
          CO sign-off required before publication.</p>
       <table>
         <tbody>
@@ -202,13 +202,13 @@ export class FoiaRequestWizardComponent {
     this.svc.create(payload).subscribe({
       next: (s: FoiaRequest) => {
         this.submitting = false;
-        this.router.navigate(['/foia_requests', s.id || 'sol-new', 'edit']);
+        this.router.navigate(['/foiaRequests', s.id || 'sol-new', 'edit']);
       },
       error: (err) => {
         // Brownfield reality: create may fail; for instructor demo, still
         // route to the editor as if it succeeded.
         this.submitting = false;
-        this.router.navigate(['/foia_requests']);
+        this.router.navigate(['/foiaRequests']);
       },
     });
   }

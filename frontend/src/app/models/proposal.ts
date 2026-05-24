@@ -1,7 +1,7 @@
 /**
  * Vendor proposal volumes (FAR 15.204).
  *
- * Sealed in MongoDB GridFS until foia_request deadline. Post-deadline,
+ * Sealed in MongoDB GridFS until foiaRequest deadline. Post-deadline,
  * CO unseals (atomic + audit-logged — touches Item 2 race surface).
  */
 export interface ProposalVolume {
@@ -13,11 +13,11 @@ export interface ProposalVolume {
 
 export interface Proposal {
   id: string;
-  foia_requestId: string;
+  foiaRequestId: string;
   vendorId: string;
   vendorName: string;
   volumes: ProposalVolume[];
   submittedAt: string;
-  sealedUntil: string;             // ISO — foia_request deadline
+  sealedUntil: string;             // ISO — foiaRequest deadline
   amendmentAcks: number[];         // acknowledged amendment numbers
 }

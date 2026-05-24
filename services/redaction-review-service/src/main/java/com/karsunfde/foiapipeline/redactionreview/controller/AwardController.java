@@ -20,13 +20,13 @@ public class AwardController {
         this.svc = svc;
     }
 
-    @PostMapping("/redaction_reviews/{id}/award")
+    @PostMapping("/redactionReviews/{id}/award")
     public ResponseEntity<Award> recordAward(
-            @PathVariable("id") String redaction_reviewId,
+            @PathVariable("id") String redactionReviewId,
             @RequestBody Map<String, String> body,
             @RequestHeader(value = "X-User", defaultValue = "anonymous") String actor) {
         String winningProposalId = body.getOrDefault("winningProposalId", null);
-        return svc.recordAward(redaction_reviewId, winningProposalId, actor)
+        return svc.recordAward(redactionReviewId, winningProposalId, actor)
             .map(ResponseEntity::ok)
             .orElse(ResponseEntity.notFound().build());
     }

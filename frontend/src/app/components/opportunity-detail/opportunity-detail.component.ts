@@ -1,7 +1,7 @@
 import { Component, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { ActivatedRoute, RouterLink } from '@angular/router';
-import { FoiaRequest } from '../../models/foia_request';
+import { FoiaRequest } from '../../models/foia-request';
 import { Amendment } from '../../models/amendment';
 import { Qna } from '../../models/qna';
 import { FIXTURE_SOLICITATIONS, FIXTURE_AMENDMENTS, FIXTURE_QNA } from '../../services/mock-fixtures';
@@ -20,9 +20,9 @@ import { FIXTURE_SOLICITATIONS, FIXTURE_AMENDMENTS, FIXTURE_QNA } from '../../se
   template: `
     <div class="page-header">
       <div>
-        <h2>{{ foia_request?.title }}</h2>
+        <h2>{{ foiaRequest?.title }}</h2>
         <div class="subtitle">
-          {{ foia_request?.noticeType }} · {{ foia_request?.agencyId }} · NAICS {{ foia_request?.naics }}
+          {{ foiaRequest?.noticeType }} · {{ foiaRequest?.agencyId }} · NAICS {{ foiaRequest?.naics }}
         </div>
       </div>
       <a routerLink="/public/opportunities"><button class="secondary">← All opportunities</button></a>
@@ -35,7 +35,7 @@ import { FIXTURE_SOLICITATIONS, FIXTURE_AMENDMENTS, FIXTURE_QNA } from '../../se
           <!-- ⚠ Item 9: description rendered raw via innerHTML in the production
                version. Here we use text interpolation but the backend stores
                raw HTML; cohort discovers the W4 surface in the network tab. -->
-          <p>{{ foia_request?.description }}</p>
+          <p>{{ foiaRequest?.description }}</p>
         </div>
 
         <div class="card">
@@ -59,11 +59,11 @@ import { FIXTURE_SOLICITATIONS, FIXTURE_AMENDMENTS, FIXTURE_QNA } from '../../se
           <h3>Key dates</h3>
           <table>
             <tbody>
-              <tr><th>Posted</th><td>{{ foia_request?.createdAt | date:'mediumDate' }}</td></tr>
-              <tr><th>Proposals due</th><td>{{ foia_request?.proposalsDueAt ? (foia_request?.proposalsDueAt | date:'medium') : '—' }}</td></tr>
-              <tr><th>Status</th><td><span class="badge" [ngClass]="(foia_request?.status || '').toLowerCase()">{{ foia_request?.status }}</span></td></tr>
-              <tr><th>Ceiling</th><td>\${{ (foia_request?.ceilingValue || 0).toLocaleString() }}</td></tr>
-              <tr><th>Set-aside</th><td>{{ foia_request?.setAside }}</td></tr>
+              <tr><th>Posted</th><td>{{ foiaRequest?.createdAt | date:'mediumDate' }}</td></tr>
+              <tr><th>Proposals due</th><td>{{ foiaRequest?.proposalsDueAt ? (foiaRequest?.proposalsDueAt | date:'medium') : '—' }}</td></tr>
+              <tr><th>Status</th><td><span class="badge" [ngClass]="(foiaRequest?.status || '').toLowerCase()">{{ foiaRequest?.status }}</span></td></tr>
+              <tr><th>Ceiling</th><td>\${{ (foiaRequest?.ceilingValue || 0).toLocaleString() }}</td></tr>
+              <tr><th>Set-aside</th><td>{{ foiaRequest?.setAside }}</td></tr>
             </tbody>
           </table>
         </div>
@@ -97,7 +97,7 @@ import { FIXTURE_SOLICITATIONS, FIXTURE_AMENDMENTS, FIXTURE_QNA } from '../../se
 })
 export class OpportunityDetailComponent implements OnInit {
   id = '';
-  foia_request: FoiaRequest | null = null;
+  foiaRequest: FoiaRequest | null = null;
   amendments: Amendment[] = [];
   qna: Qna[] = [];
 
@@ -105,9 +105,9 @@ export class OpportunityDetailComponent implements OnInit {
 
   ngOnInit(): void {
     this.id = this.route.snapshot.params['id'];
-    this.foia_request = FIXTURE_SOLICITATIONS.find((s) => s.id === this.id) ?? FIXTURE_SOLICITATIONS[0];
-    this.amendments = FIXTURE_AMENDMENTS.filter((a) => a.foia_requestId === this.id);
-    this.qna = FIXTURE_QNA.filter((q) => q.foia_requestId === this.id);
+    this.foiaRequest = FIXTURE_SOLICITATIONS.find((s) => s.id === this.id) ?? FIXTURE_SOLICITATIONS[0];
+    this.amendments = FIXTURE_AMENDMENTS.filter((a) => a.foiaRequestId === this.id);
+    this.qna = FIXTURE_QNA.filter((q) => q.foiaRequestId === this.id);
   }
 
   publicQna(): Qna[] {
@@ -115,7 +115,7 @@ export class OpportunityDetailComponent implements OnInit {
   }
 
   sectionC(): string {
-    return `C.1 SCOPE. ${this.foia_request?.description || ''}\n\nC.2 BACKGROUND. Karsun-aligned federal acquisition modernization scope.\n\nC.3 TASKS.\nTask 1: Service Operations\nTask 2: Continuous Monitoring\nTask 3: Incident Response`;
+    return `C.1 SCOPE. ${this.foiaRequest?.description || ''}\n\nC.2 BACKGROUND. Karsun-aligned federal acquisition modernization scope.\n\nC.3 TASKS.\nTask 1: Service Operations\nTask 2: Continuous Monitoring\nTask 3: Incident Response`;
   }
 
   sectionL(): string {

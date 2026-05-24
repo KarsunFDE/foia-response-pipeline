@@ -8,8 +8,8 @@ import org.springframework.web.client.RestTemplate;
 /**
  * foia-response-pipeline — RedactionReview Service.
  *
- * Coordinates redaction_review panels for foia_requests. Calls foia-request-service
- * synchronously to fetch foia_request data (⚠ no circuit breaker — Item 3).
+ * Coordinates redactionReview panels for foiaRequests. Calls foia-request-service
+ * synchronously to fetch foiaRequest data (⚠ no circuit breaker — Item 3).
  *
  * Brownfield-debt items in this service:
  *   - Item 3 — No Resilience4j circuit breaker on outbound calls

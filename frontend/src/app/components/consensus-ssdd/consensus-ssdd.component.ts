@@ -4,7 +4,7 @@ import { FormsModule } from '@angular/forms';
 import { ActivatedRoute, RouterLink } from '@angular/router';
 import { RoleService } from '../../services/role.service';
 import { FIXTURE_EVALUATION, FIXTURE_PROPOSALS, FIXTURE_SCORES } from '../../services/mock-fixtures';
-import { RedactionReviewFactor } from '../../models/redaction_review';
+import { RedactionReviewFactor } from '../../models/redaction-review';
 
 /**
  * Source Selection Tradeoff + SSDD draft (FAR 15.308).
@@ -24,7 +24,7 @@ import { RedactionReviewFactor } from '../../models/redaction_review';
         <h2>Source selection — tradeoff &amp; SSDD</h2>
         <div class="subtitle">FAR 15.308 · SSA authority non-delegable</div>
       </div>
-      <a routerLink="/redaction_review/workspace"><button class="secondary">← Evaluator workspace</button></a>
+      <a routerLink="/redactionReview/workspace"><button class="secondary">← Evaluator workspace</button></a>
     </div>
 
     <div class="hitl-banner">
@@ -39,14 +39,14 @@ import { RedactionReviewFactor } from '../../models/redaction_review';
         <thead>
           <tr>
             <th>Proposal</th>
-            <th *ngFor="let f of redaction_review.factors">{{ f.name }} <small>({{ f.weight }}%)</small></th>
+            <th *ngFor="let f of redactionReview.factors">{{ f.name }} <small>({{ f.weight }}%)</small></th>
             <th>Weighted total</th>
           </tr>
         </thead>
         <tbody>
           <tr *ngFor="let p of proposals">
             <td><strong>{{ p.vendorName }}</strong></td>
-            <td *ngFor="let f of redaction_review.factors">{{ avgScore(p.id, f.id) | number:'1.0-1' }}</td>
+            <td *ngFor="let f of redactionReview.factors">{{ avgScore(p.id, f.id) | number:'1.0-1' }}</td>
             <td><strong>{{ weighted(p.id) | number:'1.0-2' }}</strong></td>
           </tr>
         </tbody>
@@ -73,13 +73,13 @@ import { RedactionReviewFactor } from '../../models/redaction_review';
   `,
 })
 export class ConsensusSsddComponent {
-  redaction_review = FIXTURE_EVALUATION;
+  redactionReview = FIXTURE_EVALUATION;
   proposals = FIXTURE_PROPOSALS;
   ssddNarrative = '';
   signed = false;
 
   constructor(public role: RoleService, route: ActivatedRoute) {
-    // Route param `solId` reserved for multi-redaction_review routing.
+    // Route param `solId` reserved for multi-redactionReview routing.
   }
 
   avgScore(proposalId: string, factorId: string): number {
@@ -89,7 +89,7 @@ export class ConsensusSsddComponent {
   }
 
   weighted(proposalId: string): number {
-    return this.redaction_review.factors.reduce(
+    return this.redactionReview.factors.reduce(
       (sum: number, f: RedactionReviewFactor) => sum + this.avgScore(proposalId, f.id) * (f.weight / 100),
       0,
     );
@@ -103,7 +103,7 @@ export class ConsensusSsddComponent {
       `Source Selection Decision Document (SSDD)\n\n` +
       `Pursuant to FAR 15.308, the Source Selection Authority has determined that ` +
       `${best.name} represents the best value to the Government under the ` +
-      `redaction_review criteria of Section M. The weighted technical score of ` +
+      `redactionReview criteria of Section M. The weighted technical score of ` +
       `${best.score.toFixed(2)} is consistent with the tradeoff analysis between ` +
       `technical capability, past performance, and price.\n\n` +
       `[AI-DRAFTED — SSA must review for factual accuracy. Item 4 (no Pydantic schema), Item 5 (legacy LLMChain).]`;

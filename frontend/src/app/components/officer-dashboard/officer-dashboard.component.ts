@@ -8,9 +8,9 @@ import { NotificationService } from '../../services/notification.service';
 /**
  * Officer Dashboard — role-aware landing for CO / CS / PM / SSA.
  *
- * Per feature-inventory-target.md: KPI tiles for open foia_requests,
+ * Per feature-inventory-target.md: KPI tiles for open foiaRequests,
  * proposals awaiting eval, amendments due, CPARs due in 30 days.
- * Touches Item 8 (hardcoded URL lives in the foia_request-list
+ * Touches Item 8 (hardcoded URL lives in the foiaRequest-list
  * component referenced below) — keeping the localized teaching
  * artifact intact.
  */
@@ -25,14 +25,14 @@ import { NotificationService } from '../../services/notification.service';
         <div class="subtitle">{{ role.current.displayName }} · {{ role.current.authorityNote }}</div>
       </div>
       <div>
-        <a routerLink="/foia_requests/new"><button>+ New foia_request</button></a>
+        <a routerLink="/foiaRequests/new"><button>+ New foiaRequest</button></a>
       </div>
     </div>
 
     <section class="kpi-grid">
       <div class="kpi-tile">
         <div class="kpi-value">{{ openFoiaRequests() }}</div>
-        <div class="kpi-label">Open foia_requests</div>
+        <div class="kpi-label">Open foiaRequests</div>
       </div>
       <div class="kpi-tile">
         <div class="kpi-value">{{ proposalsAwaitingEval() }}</div>
@@ -60,7 +60,7 @@ import { NotificationService } from '../../services/notification.service';
           <tbody>
             <tr *ngFor="let s of pipeline()">
               <td>
-                <a [routerLink]="['/foia_requests', s.id, 'edit']">{{ s.title }}</a>
+                <a [routerLink]="['/foiaRequests', s.id, 'edit']">{{ s.title }}</a>
                 <div style="font-size:0.75rem;color:var(--color-fg-muted)">{{ s.noticeType }} · NAICS {{ s.naics }}</div>
               </td>
               <td><span class="badge" [ngClass]="(s.status || '').toLowerCase()">{{ s.status }}</span></td>
@@ -84,14 +84,14 @@ import { NotificationService } from '../../services/notification.service';
     <div class="card" style="margin-top:1rem">
       <h3>Quick links</h3>
       <p>
-        <a routerLink="/foia_requests">All foia_requests</a> ·
+        <a routerLink="/foiaRequests">All foiaRequests</a> ·
         <a routerLink="/reports">All reports</a> ·
         <a routerLink="/vendors">Vendor directory</a> ·
         <a routerLink="/admin/audit">Audit log search</a>
       </p>
       <p style="font-size:0.8rem;color:var(--color-fg-muted)">
-        ⚠ Legacy foia_request-list (Debt Item 8) is still wired at
-        <a routerLink="/foia_requests">/foia_requests</a> — preserved
+        ⚠ Legacy foiaRequest-list (Debt Item 8) is still wired at
+        <a routerLink="/foiaRequests">/foiaRequests</a> — preserved
         as the W4 Tue API-modernization teaching artifact.
       </p>
     </div>

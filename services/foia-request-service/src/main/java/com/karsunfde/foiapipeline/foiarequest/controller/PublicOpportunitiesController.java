@@ -56,7 +56,7 @@ public class PublicOpportunitiesController {
     public ResponseEntity<Map<String, Object>> detail(@PathVariable String id) {
         return svc.findById(id).map(s -> {
             Map<String, Object> body = new HashMap<>();
-            body.put("foia_request", s);
+            body.put("foiaRequest", s);
             List<Amendment> amendments = amendmentSvc.listForFoiaRequest(id);
             body.put("amendments", amendments);
             return ResponseEntity.ok(body);

@@ -8,8 +8,8 @@ import java.util.ArrayList;
 import java.util.List;
 
 /**
- * Vendor proposal submitted in response to a foia_request. Sealed until
- * foia_request closing deadline; visible to evaluators after CO unseals.
+ * Vendor proposal submitted in response to a foiaRequest. Sealed until
+ * foiaRequest closing deadline; visible to evaluators after CO unseals.
  *
  * ⚠ Item 2 — unseal is a multi-write transition; race with crash can leave
  * audit-log gap for SSDD-impacting event.
@@ -21,7 +21,7 @@ public class Proposal {
     @Id
     private String id;
 
-    private String foia_requestId;
+    private String foiaRequestId;
     private String vendorId;
     private String agencyId;
 
@@ -39,8 +39,8 @@ public class Proposal {
 
     public String getId() { return id; }
     public void setId(String id) { this.id = id; }
-    public String getFoiaRequestId() { return foia_requestId; }
-    public void setFoiaRequestId(String foia_requestId) { this.foia_requestId = foia_requestId; }
+    public String getFoiaRequestId() { return foiaRequestId; }
+    public void setFoiaRequestId(String foiaRequestId) { this.foiaRequestId = foiaRequestId; }
     public String getVendorId() { return vendorId; }
     public void setVendorId(String vendorId) { this.vendorId = vendorId; }
     public String getAgencyId() { return agencyId; }

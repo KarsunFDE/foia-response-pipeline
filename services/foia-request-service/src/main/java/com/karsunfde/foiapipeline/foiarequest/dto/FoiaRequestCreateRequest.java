@@ -1,7 +1,7 @@
 package com.karsunfde.foiapipeline.foiarequest.dto;
 
 /**
- * Create-foia_request request DTO.
+ * Create-foiaRequest request DTO.
  *
  * ⚠ DELIBERATE — Item 9:
  *   No {@code @SafeHtml}, no {@code @NotBlank}, no length cap on

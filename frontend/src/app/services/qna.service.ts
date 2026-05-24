@@ -8,22 +8,22 @@ import { Qna } from '../models/qna';
 export class QnaService {
   constructor(private http: HttpClient) {}
 
-  list(foia_requestId: string): Observable<Qna[]> {
+  list(foiaRequestId: string): Observable<Qna[]> {
     return this.http.get<Qna[]>(
-      `${environment.apiGatewayUrl}/api/foia-requests/${foia_requestId}/qa`,
+      `${environment.apiGatewayUrl}/api/foia-requests/${foiaRequestId}/qa`,
     );
   }
 
-  answer(foia_requestId: string, qaId: string, answer: string): Observable<Qna> {
+  answer(foiaRequestId: string, qaId: string, answer: string): Observable<Qna> {
     return this.http.put<Qna>(
-      `${environment.apiGatewayUrl}/api/foia-requests/${foia_requestId}/qa/${qaId}/answer`,
+      `${environment.apiGatewayUrl}/api/foia-requests/${foiaRequestId}/qa/${qaId}/answer`,
       { answer },
     );
   }
 
-  submitQuestion(foia_requestId: string, question: string): Observable<Qna> {
+  submitQuestion(foiaRequestId: string, question: string): Observable<Qna> {
     return this.http.post<Qna>(
-      `${environment.apiGatewayUrl}/api/foia-requests/${foia_requestId}/qa`,
+      `${environment.apiGatewayUrl}/api/foia-requests/${foiaRequestId}/qa`,
       { question },
     );
   }

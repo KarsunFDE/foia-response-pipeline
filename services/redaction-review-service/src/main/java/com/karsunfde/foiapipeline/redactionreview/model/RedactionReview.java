@@ -14,13 +14,13 @@ import java.util.List;
  * ⚠ Item 3 — fetching proposal text for scoring is the canonical reproducer
  * for the no-circuit-breaker debt (evaluator → foia-request-service hot loop).
  */
-@Document(collection = "redaction_reviews")
+@Document(collection = "redactionReviews")
 public class RedactionReview {
 
     @Id
     private String id;
 
-    private String foia_requestId;
+    private String foiaRequestId;
     private String agencyId;
     private String state;
     private List<String> panelMembers = new ArrayList<>();
@@ -33,8 +33,8 @@ public class RedactionReview {
 
     public String getId() { return id; }
     public void setId(String id) { this.id = id; }
-    public String getFoiaRequestId() { return foia_requestId; }
-    public void setFoiaRequestId(String foia_requestId) { this.foia_requestId = foia_requestId; }
+    public String getFoiaRequestId() { return foiaRequestId; }
+    public void setFoiaRequestId(String foiaRequestId) { this.foiaRequestId = foiaRequestId; }
     public String getAgencyId() { return agencyId; }
     public void setAgencyId(String agencyId) { this.agencyId = agencyId; }
     public String getState() { return state; }

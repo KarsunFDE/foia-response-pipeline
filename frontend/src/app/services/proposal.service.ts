@@ -8,9 +8,9 @@ import { Proposal } from '../models/proposal';
 export class ProposalService {
   constructor(private http: HttpClient) {}
 
-  listForFoiaRequest(foia_requestId: string): Observable<Proposal[]> {
+  listForFoiaRequest(foiaRequestId: string): Observable<Proposal[]> {
     return this.http.get<Proposal[]>(
-      `${environment.apiGatewayUrl}/api/foia-requests/${foia_requestId}/proposals`,
+      `${environment.apiGatewayUrl}/api/foia-requests/${foiaRequestId}/proposals`,
     );
   }
 
@@ -21,12 +21,12 @@ export class ProposalService {
   }
 
   acknowledgeAmendment(
-    foia_requestId: string,
+    foiaRequestId: string,
     proposalId: string,
     amendmentNumber: number,
   ): Observable<void> {
     return this.http.post<void>(
-      `${environment.apiGatewayUrl}/api/foia-requests/${foia_requestId}/proposals/${proposalId}/acknowledge-amendment`,
+      `${environment.apiGatewayUrl}/api/foia-requests/${foiaRequestId}/proposals/${proposalId}/acknowledge-amendment`,
       { amendmentNumber },
     );
   }

@@ -14,7 +14,7 @@ import java.util.List;
  * Per D-059 Cohort #1 Pair 3 (foia-response-pipeline) injection from
  * skills/pair-brownfield-generator/references/pair-unique-debt-pool.yml.
  *
- * <p>This repository exposes a SQL search surface over the {@code foia_requests}
+ * <p>This repository exposes a SQL search surface over the {@code foiaRequests}
  * audit-and-reporting table (Postgres side; the document store on the Mongo
  * side is unaffected). Search-by-status is implemented via raw string
  * concatenation — classic OWASP A03 Injection.</p>
@@ -61,7 +61,7 @@ public class SearchRepository {
     public List<RedactionReview> searchByStatus(@Nullable String status) {
         // ⚠ pair-unique debt sec-sql-string-concat-aspect-search:
         // classic concat — `status=' OR '1'='1` injects.
-        String sql = "SELECT * FROM foia_requests WHERE status = '" + status + "'";
+        String sql = "SELECT * FROM foiaRequests WHERE status = '" + status + "'";
         return jdbc.query(sql, MAPPER);
     }
 
@@ -72,7 +72,7 @@ public class SearchRepository {
      * tautological).
      */
     public int totalCount() {
-        Integer n = jdbc.queryForObject("SELECT COUNT(*) FROM foia_requests", Integer.class);
+        Integer n = jdbc.queryForObject("SELECT COUNT(*) FROM foiaRequests", Integer.class);
         return n == null ? 0 : n;
     }
 }

@@ -12,7 +12,7 @@ public class RedactionReviewScore {
     @Id
     private String id;
 
-    private String redaction_reviewId;
+    private String redactionReviewId;
     private String evaluatorId;
     private String proposalId;
     private String factorId;
@@ -24,8 +24,8 @@ public class RedactionReviewScore {
 
     public String getId() { return id; }
     public void setId(String id) { this.id = id; }
-    public String getRedactionReviewId() { return redaction_reviewId; }
-    public void setRedactionReviewId(String redaction_reviewId) { this.redaction_reviewId = redaction_reviewId; }
+    public String getRedactionReviewId() { return redactionReviewId; }
+    public void setRedactionReviewId(String redactionReviewId) { this.redactionReviewId = redactionReviewId; }
     public String getEvaluatorId() { return evaluatorId; }
     public void setEvaluatorId(String evaluatorId) { this.evaluatorId = evaluatorId; }
     public String getProposalId() { return proposalId; }

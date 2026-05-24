@@ -6,9 +6,9 @@ import org.springframework.data.mongodb.core.mapping.Document;
 import java.time.Instant;
 
 /**
- * Vendor-submitted question + agency-published answer for a foia_request.
+ * Vendor-submitted question + agency-published answer for a foiaRequest.
  *
- * Q&A is part of FAR 15.201 pre-foia_request exchanges. Vendor identity is
+ * Q&A is part of FAR 15.201 pre-foiaRequest exchanges. Vendor identity is
  * redacted on publish (other vendors see the Q + A but not the asker).
  *
  * ⚠ Item 9 — {@code question} + {@code answer} are raw text fed into
@@ -20,7 +20,7 @@ public class Qna {
     @Id
     private String id;
 
-    private String foia_requestId;
+    private String foiaRequestId;
     private String agencyId;
 
     /** ⚠ Item 9 — raw HTML accepted. */
@@ -38,8 +38,8 @@ public class Qna {
 
     public String getId() { return id; }
     public void setId(String id) { this.id = id; }
-    public String getFoiaRequestId() { return foia_requestId; }
-    public void setFoiaRequestId(String foia_requestId) { this.foia_requestId = foia_requestId; }
+    public String getFoiaRequestId() { return foiaRequestId; }
+    public void setFoiaRequestId(String foiaRequestId) { this.foiaRequestId = foiaRequestId; }
     public String getAgencyId() { return agencyId; }
     public void setAgencyId(String agencyId) { this.agencyId = agencyId; }
     public String getQuestion() { return question; }

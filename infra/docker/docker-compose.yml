@@ -47,8 +47,8 @@ services:
       - "8080:8080"
     environment:
       JWT_ISSUER_URI: http://localhost:8090/auth
-      SOLICITATION_SERVICE_URL: http://foia-request-service:8081
-      EVALUATION_SERVICE_URL: http://redaction-review-service:8082
+      FOIA_REQUEST_SERVICE_URL: http://foia-request-service:8081
+      REDACTION_REVIEW_SERVICE_URL: http://redaction-review-service:8082
       AI_ORCHESTRATOR_URL: http://ai-orchestrator:8000
     depends_on:
       - foia-request-service
@@ -79,7 +79,7 @@ services:
     ports:
       - "8082:8082"
     environment:
-      SOLICITATION_SERVICE_URL: http://foia-request-service:8081
+      FOIA_REQUEST_SERVICE_URL: http://foia-request-service:8081
       # ⚠ DELIBERATE: redaction-review-service calls foia-request-service directly,
       #   not through the gateway — tighter coupling than necessary, and the
       #   call has no circuit breaker (Item 3).

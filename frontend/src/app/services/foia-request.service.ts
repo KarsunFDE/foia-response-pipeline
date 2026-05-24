@@ -2,13 +2,13 @@ import { Injectable } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { Observable } from 'rxjs';
 import { environment } from '../../environments/environment';
-import { FoiaRequest, FoiaRequestCreate } from '../models/foia_request';
+import { FoiaRequest, FoiaRequestCreate } from '../models/foia-request';
 
 /**
  * FoiaRequest service — the "right" way to talk to the backend.
  *
  * Goes through the API gateway (environment.apiGatewayUrl). The cohort
- * compares this with `foia_request-list.component.ts`, which hardcodes
+ * compares this with `foiaRequest-list.component.ts`, which hardcodes
  * `http://localhost:8081` and bypasses the gateway (Item 8).
  */
 @Injectable({ providedIn: 'root' })

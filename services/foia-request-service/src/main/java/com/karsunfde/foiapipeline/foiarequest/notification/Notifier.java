@@ -26,39 +26,39 @@ import java.util.List;
  *     legacy LangChain path (see legacy_chain.py in ai-orchestrator).
  *   - Item 6 — no correlation-ID threaded into the notification log.
  *   - Item 10 — "registered vendors" matcher ignores agency_id; can leak
- *     a foia_request notice to vendors outside the issuing agency.
+ *     a foiaRequest notice to vendors outside the issuing agency.
  */
 @Component
 public class Notifier {
 
     private static final Logger log = LoggerFactory.getLogger(Notifier.class);
 
-    public void foia_requestPublished(String foia_requestId, String agencyId,
+    public void foiaRequestPublished(String foiaRequestId, String agencyId,
                                        String naics, List<String> vendorEmails) {
         // ⚠ Item 10 — vendorEmails is computed without agency_id filter
         // upstream; cohort discovers in W4 Wed.
-        log.info("notify[PUBLISH] foia_requestId={} agencyId={} naics={} recipients={}",
-            foia_requestId, agencyId, naics, vendorEmails.size());
+        log.info("notify[PUBLISH] foiaRequestId={} agencyId={} naics={} recipients={}",
+            foiaRequestId, agencyId, naics, vendorEmails.size());
     }
 
-    public void amendmentIssued(String foia_requestId, int amendmentNumber,
+    public void amendmentIssued(String foiaRequestId, int amendmentNumber,
                                  List<String> vendorEmails) {
         // ⚠ Item 2 — fire-and-forget; not in the audit transaction.
-        log.info("notify[AMEND] foia_requestId={} amendment={} recipients={}",
-            foia_requestId, amendmentNumber, vendorEmails.size());
+        log.info("notify[AMEND] foiaRequestId={} amendment={} recipients={}",
+            foiaRequestId, amendmentNumber, vendorEmails.size());
     }
 
-    public void proposalReceived(String foia_requestId, String proposalId,
+    public void proposalReceived(String foiaRequestId, String proposalId,
                                   List<String> agencyEmails) {
         // ⚠ Item 6 — correlation-id not present.
-        log.info("notify[PROPOSAL_RX] foia_requestId={} proposalId={} recipients={}",
-            foia_requestId, proposalId, agencyEmails.size());
+        log.info("notify[PROPOSAL_RX] foiaRequestId={} proposalId={} recipients={}",
+            foiaRequestId, proposalId, agencyEmails.size());
     }
 
-    public void redaction_reviewDue(String redaction_reviewId, List<String> evaluatorEmails) {
+    public void redactionReviewDue(String redactionReviewId, List<String> evaluatorEmails) {
         // ⚠ Item 3 — no retry/circuit on notification dispatch path.
-        log.info("notify[EVAL_DUE] redaction_reviewId={} recipients={}",
-            redaction_reviewId, evaluatorEmails.size());
+        log.info("notify[EVAL_DUE] redactionReviewId={} recipients={}",
+            redactionReviewId, evaluatorEmails.size());
     }
 
     public void awardDecision(String awardId, String winningVendorEmail,

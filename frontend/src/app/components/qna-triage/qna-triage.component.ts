@@ -20,10 +20,10 @@ import { FIXTURE_QNA, FIXTURE_SOLICITATIONS } from '../../services/mock-fixtures
   template: `
     <div class="page-header">
       <div>
-        <h2>Q&amp;A triage — {{ foia_requestTitle() }}</h2>
+        <h2>Q&amp;A triage — {{ foiaRequestTitle() }}</h2>
         <div class="subtitle">CS triages · AI-drafts answer · CO approves · published to all registered vendors</div>
       </div>
-      <a [routerLink]="['/foia_requests', foia_requestId, 'edit']"><button class="secondary">← Back to foia_request</button></a>
+      <a [routerLink]="['/foiaRequests', foiaRequestId, 'edit']"><button class="secondary">← Back to foiaRequest</button></a>
     </div>
 
     <div class="hitl-banner">
@@ -66,20 +66,20 @@ import { FIXTURE_QNA, FIXTURE_SOLICITATIONS } from '../../services/mock-fixtures
   `,
 })
 export class QnaTriageComponent implements OnInit {
-  foia_requestId = '';
+  foiaRequestId = '';
   qna: Qna[] = [];
 
   constructor(private route: ActivatedRoute) {}
 
   ngOnInit(): void {
-    this.foia_requestId = this.route.snapshot.params['id'];
+    this.foiaRequestId = this.route.snapshot.params['id'];
     this.qna = FIXTURE_QNA
-      .filter((q) => q.foia_requestId === this.foia_requestId)
+      .filter((q) => q.foiaRequestId === this.foiaRequestId)
       .map((q) => ({ ...q }));
   }
 
-  foia_requestTitle(): string {
-    return FIXTURE_SOLICITATIONS.find((s) => s.id === this.foia_requestId)?.title ?? this.foia_requestId;
+  foiaRequestTitle(): string {
+    return FIXTURE_SOLICITATIONS.find((s) => s.id === this.foiaRequestId)?.title ?? this.foiaRequestId;
   }
 
   aiDraft(q: Qna): void {

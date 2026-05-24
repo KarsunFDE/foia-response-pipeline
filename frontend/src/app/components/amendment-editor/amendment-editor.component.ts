@@ -21,14 +21,14 @@ import { Amendment } from '../../models/amendment';
   template: `
     <div class="page-header">
       <div>
-        <h2>Amendments — {{ foia_requestTitle() }}</h2>
+        <h2>Amendments — {{ foiaRequestTitle() }}</h2>
         <div class="subtitle">FAR 15.206 · CO-only issuance · vendor acknowledgement required</div>
       </div>
-      <a [routerLink]="['/foia_requests', foia_requestId, 'edit']"><button class="secondary">← Back to foia_request</button></a>
+      <a [routerLink]="['/foiaRequests', foiaRequestId, 'edit']"><button class="secondary">← Back to foiaRequest</button></a>
     </div>
 
     <div class="card" *ngIf="role.currentRole !== 'contracting_officer'">
-      <p>You are not the Contracting Officer for this foia_request; amendments are read-only.</p>
+      <p>You are not the Contracting Officer for this foiaRequest; amendments are read-only.</p>
     </div>
 
     <div class="card">
@@ -89,7 +89,7 @@ import { Amendment } from '../../models/amendment';
   `,
 })
 export class AmendmentEditorComponent implements OnInit {
-  foia_requestId = '';
+  foiaRequestId = '';
   amendments: Amendment[] = [];
 
   draft = {
@@ -103,22 +103,22 @@ export class AmendmentEditorComponent implements OnInit {
   constructor(private route: ActivatedRoute, public role: RoleService) {}
 
   ngOnInit(): void {
-    this.foia_requestId = this.route.snapshot.params['id'];
-    this.amendments = FIXTURE_AMENDMENTS.filter((a) => a.foia_requestId === this.foia_requestId);
+    this.foiaRequestId = this.route.snapshot.params['id'];
+    this.amendments = FIXTURE_AMENDMENTS.filter((a) => a.foiaRequestId === this.foiaRequestId);
   }
 
-  foia_requestTitle(): string {
-    return FIXTURE_SOLICITATIONS.find((s) => s.id === this.foia_requestId)?.title ?? this.foia_requestId;
+  foiaRequestTitle(): string {
+    return FIXTURE_SOLICITATIONS.find((s) => s.id === this.foiaRequestId)?.title ?? this.foiaRequestId;
   }
 
   totalProposalCount(): number {
-    return FIXTURE_PROPOSALS.filter((p) => p.foia_requestId === this.foia_requestId).length;
+    return FIXTURE_PROPOSALS.filter((p) => p.foiaRequestId === this.foiaRequestId).length;
   }
 
   aiDraft(): void {
     // Stubbed — W3 multi-agent flow predicts impact then drafts text.
     this.draft.changeSummary =
-      `Per FAR 15.206, this amendment ${this.draft.changeSummary || 'modifies the foia_request'} ` +
+      `Per FAR 15.206, this amendment ${this.draft.changeSummary || 'modifies the foiaRequest'} ` +
       `effective ${this.draft.effectiveAt}. Vendors with proposals-in-progress must acknowledge ` +
       `prior to the revised deadline.`;
     this.impactPrediction = {
@@ -132,7 +132,7 @@ export class AmendmentEditorComponent implements OnInit {
     // Stubbed — would call AmendmentService.issue().
     const next: Amendment = {
       id: `am-new-${Date.now()}`,
-      foia_requestId: this.foia_requestId,
+      foiaRequestId: this.foiaRequestId,
       number: this.amendments.length + 1,
       changeSummary: this.draft.changeSummary,
       effectiveAt: new Date(this.draft.effectiveAt).toISOString(),

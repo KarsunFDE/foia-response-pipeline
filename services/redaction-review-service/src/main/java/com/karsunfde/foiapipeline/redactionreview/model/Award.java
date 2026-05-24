@@ -14,8 +14,8 @@ public class Award {
     @Id
     private String id;
 
-    private String redaction_reviewId;
-    private String foia_requestId;
+    private String redactionReviewId;
+    private String foiaRequestId;
     private String winningProposalId;
     private String agencyId;
     private String contractNumber;
@@ -29,10 +29,10 @@ public class Award {
 
     public String getId() { return id; }
     public void setId(String id) { this.id = id; }
-    public String getRedactionReviewId() { return redaction_reviewId; }
-    public void setRedactionReviewId(String redaction_reviewId) { this.redaction_reviewId = redaction_reviewId; }
-    public String getFoiaRequestId() { return foia_requestId; }
-    public void setFoiaRequestId(String foia_requestId) { this.foia_requestId = foia_requestId; }
+    public String getRedactionReviewId() { return redactionReviewId; }
+    public void setRedactionReviewId(String redactionReviewId) { this.redactionReviewId = redactionReviewId; }
+    public String getFoiaRequestId() { return foiaRequestId; }
+    public void setFoiaRequestId(String foiaRequestId) { this.foiaRequestId = foiaRequestId; }
     public String getWinningProposalId() { return winningProposalId; }
     public void setWinningProposalId(String winningProposalId) { this.winningProposalId = winningProposalId; }
     public String getAgencyId() { return agencyId; }

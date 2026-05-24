@@ -3,7 +3,7 @@ import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { RouterLink } from '@angular/router';
 import { FIXTURE_SOLICITATIONS } from '../../services/mock-fixtures';
-import { FoiaRequest } from '../../models/foia_request';
+import { FoiaRequest } from '../../models/foia-request';
 
 /**
  * Public Opportunity Search (SAM.gov-style).

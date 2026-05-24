@@ -4,8 +4,8 @@
 
 export interface Award {
   id: string;
-  redaction_reviewId: string;
-  foia_requestId: string;
+  redactionReviewId: string;
+  foiaRequestId: string;
   winningVendorId: string;
   winningVendorName: string;
   contractNumber: string;

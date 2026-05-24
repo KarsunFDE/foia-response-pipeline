@@ -28,7 +28,7 @@ import java.util.Map;
  *   DRAFT -> INTERNAL_REVIEW -> READY_TO_PUBLISH -> PUBLISHED -> (AMENDED)* -> CLOSED
  *   CANCELLED is reachable from any pre-PUBLISHED state.
  */
-@Document(collection = "foia_requests")
+@Document(collection = "foiaRequests")
 public class FoiaRequest {
 
     @Id

@@ -33,8 +33,8 @@ public class FoiaRequestClient {
 
     private final RestTemplate restTemplate;
 
-    @Value("${foia_request.service.url:http://foia-request-service:8081}")
-    private String foia_requestServiceUrl;
+    @Value("${foiaRequest.service.url:http://foia-request-service:8081}")
+    private String foiaRequestServiceUrl;
 
     @Autowired
     public FoiaRequestClient(RestTemplate restTemplate) {
@@ -42,14 +42,14 @@ public class FoiaRequestClient {
     }
 
     /**
-     * Fetch a foia_request by id from the upstream service.
+     * Fetch a foiaRequest by id from the upstream service.
      *
      * ⚠ No try/catch — a 5xx from upstream propagates as a 500 from us.
      * ⚠ No timeout — a 30-second hang upstream is a 30-second hang here.
      */
     @SuppressWarnings("unchecked")
     public Map<String, Object> getFoiaRequest(String id) {
-        String url = foia_requestServiceUrl + "/api/foia-requests/" + id;
+        String url = foiaRequestServiceUrl + "/api/foia-requests/" + id;
         // Item 6 — redaction-review-service uses traceId key.
         log.info("calling foia-request-service url={} traceId=N/A", url);
         return restTemplate.getForObject(url, Map.class);

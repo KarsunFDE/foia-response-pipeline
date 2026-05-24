@@ -1,11 +1,11 @@
 import { Routes } from '@angular/router';
-import { FoiaRequestListComponent } from './components/foia_request-list/foia_request-list.component';
-import { FoiaRequestCreateComponent } from './components/foia_request-create/foia_request-create.component';
-import { RedactionReviewPanelComponent } from './components/redaction_review-panel/redaction_review-panel.component';
+import { FoiaRequestListComponent } from './components/foiaRequest-list/foiaRequest-list.component';
+import { FoiaRequestCreateComponent } from './components/foiaRequest-create/foiaRequest-create.component';
+import { RedactionReviewPanelComponent } from './components/redactionReview-panel/redactionReview-panel.component';
 import { OfficerDashboardComponent } from './components/officer-dashboard/officer-dashboard.component';
 import { ReportsHubComponent } from './components/reports-hub/reports-hub.component';
-import { FoiaRequestWizardComponent } from './components/foia_request-wizard/foia_request-wizard.component';
-import { FoiaRequestEditorComponent } from './components/foia_request-editor/foia_request-editor.component';
+import { FoiaRequestWizardComponent } from './components/foiaRequest-wizard/foiaRequest-wizard.component';
+import { FoiaRequestEditorComponent } from './components/foiaRequest-editor/foiaRequest-editor.component';
 import { AmendmentEditorComponent } from './components/amendment-editor/amendment-editor.component';
 import { QnaTriageComponent } from './components/qna-triage/qna-triage.component';
 import { ProposalIntakeComponent } from './components/proposal-intake/proposal-intake.component';
@@ -45,31 +45,31 @@ export const routes: Routes = [
   { path: 'reports/contract-spend', component: ReportsHubComponent },
 
   // — FoiaRequest lifecycle
-  // NOTE: /foia_requests still routes to the LEGACY FoiaRequestListComponent
+  // NOTE: /foiaRequests still routes to the LEGACY FoiaRequestListComponent
   // which hardcodes http://localhost:8081 (Item 8). PRESERVED as the W4 Tue
   // teaching artifact. New components route through environment.apiGatewayUrl.
-  { path: 'foia_requests', component: FoiaRequestListComponent },
+  { path: 'foiaRequests', component: FoiaRequestListComponent },
   {
-    path: 'foia_requests/new',
+    path: 'foiaRequests/new',
     component: FoiaRequestWizardComponent,
     canMatch: [roleGuard('contracting_officer', 'contract_specialist')],
   },
   // Legacy single-page create form kept available under a sub-route so the
   // brownfield baseline is still demoable.
-  { path: 'foia_requests/new-legacy', component: FoiaRequestCreateComponent },
-  { path: 'foia_requests/:id/edit', component: FoiaRequestEditorComponent },
+  { path: 'foiaRequests/new-legacy', component: FoiaRequestCreateComponent },
+  { path: 'foiaRequests/:id/edit', component: FoiaRequestEditorComponent },
   {
-    path: 'foia_requests/:id/amendments',
+    path: 'foiaRequests/:id/amendments',
     component: AmendmentEditorComponent,
     canMatch: [roleGuard('contracting_officer', 'contract_specialist', 'program_manager')],
   },
   {
-    path: 'foia_requests/:id/qa',
+    path: 'foiaRequests/:id/qa',
     component: QnaTriageComponent,
     canMatch: [roleGuard('contracting_officer', 'contract_specialist')],
   },
   {
-    path: 'foia_requests/:id/proposals',
+    path: 'foiaRequests/:id/proposals',
     component: ProposalIntakeComponent,
     canMatch: [roleGuard('contracting_officer', 'contract_specialist')],
   },
@@ -96,15 +96,15 @@ export const routes: Routes = [
   },
 
   // — RedactionReview + source selection
-  // Legacy redaction_review-panel kept under a sub-route for instructor comparison.
-  { path: 'redaction_reviews', component: RedactionReviewPanelComponent },
+  // Legacy redactionReview-panel kept under a sub-route for instructor comparison.
+  { path: 'redactionReviews', component: RedactionReviewPanelComponent },
   {
-    path: 'redaction_review/workspace',
+    path: 'redactionReview/workspace',
     component: EvaluatorWorkspaceComponent,
     canMatch: [roleGuard('evaluator', 'contracting_officer', 'sys_admin')],
   },
   {
-    path: 'redaction_review/:solId/consensus',
+    path: 'redactionReview/:solId/consensus',
     component: ConsensusSsddComponent,
     canMatch: [roleGuard('ssa', 'contracting_officer', 'sys_admin')],
   },

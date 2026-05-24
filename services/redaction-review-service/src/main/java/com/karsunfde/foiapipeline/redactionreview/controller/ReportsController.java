@@ -35,7 +35,7 @@ public class ReportsController {
     private final ContractModificationRepository modRepo;
     private final CparRepository cparRepo;
     private final FindingRepository findingRepo;
-    private final FoiaRequestClient foia_requestClient;
+    private final FoiaRequestClient foiaRequestClient;
 
     @Autowired
     public ReportsController(AwardRepository awardRepo,
@@ -43,19 +43,19 @@ public class ReportsController {
                              ContractModificationRepository modRepo,
                              CparRepository cparRepo,
                              FindingRepository findingRepo,
-                             FoiaRequestClient foia_requestClient) {
+                             FoiaRequestClient foiaRequestClient) {
         this.awardRepo = awardRepo;
         this.contractRepo = contractRepo;
         this.modRepo = modRepo;
         this.cparRepo = cparRepo;
         this.findingRepo = findingRepo;
-        this.foia_requestClient = foia_requestClient;
+        this.foiaRequestClient = foiaRequestClient;
     }
 
     /** SAM.gov-style pipeline by stage. */
     @GetMapping("/acquisition-pipeline")
     public Map<String, Object> acquisitionPipeline() {
-        // ⚠ Item 3 — single call fans through foia_request list w/o breaker.
+        // ⚠ Item 3 — single call fans through foiaRequest list w/o breaker.
         Map<String, Object> out = new LinkedHashMap<>();
         Map<String, Long> awardsByAgency = awardRepo.findAll().stream()
             .collect(Collectors.groupingBy(Award::getAgencyId, Collectors.counting()));
@@ -124,7 +124,7 @@ public class ReportsController {
         try {
             // ⚠ Item 3 — direct cross-service call, no breaker.
             // Sentinel call against /actuator/health to confirm reachability.
-            foia_requestClient.getFoiaRequest("__health__");
+            foiaRequestClient.getFoiaRequest("__health__");
             out.put("upstreamReachable", true);
         } catch (Exception ex) {
             out.put("upstreamReachable", false);

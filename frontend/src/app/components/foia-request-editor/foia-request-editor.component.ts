@@ -2,7 +2,7 @@ import { Component, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { ActivatedRoute, RouterLink } from '@angular/router';
-import { FoiaRequest } from '../../models/foia_request';
+import { FoiaRequest } from '../../models/foia-request';
 import { FIXTURE_SOLICITATIONS } from '../../services/mock-fixtures';
 
 /**
@@ -14,22 +14,22 @@ import { FIXTURE_SOLICITATIONS } from '../../services/mock-fixtures';
  * — must filter by agency_id (Item 10).
  */
 @Component({
-  selector: 'app-foia_request-editor',
+  selector: 'app-foiaRequest-editor',
   standalone: true,
   imports: [CommonModule, FormsModule, RouterLink],
   template: `
     <div class="page-header">
       <div>
-        <h2>{{ foia_request?.title || 'Draft foia_request' }}</h2>
+        <h2>{{ foiaRequest?.title || 'Draft foiaRequest' }}</h2>
         <div class="subtitle">
-          <span class="badge" [ngClass]="(foia_request?.status || 'draft').toLowerCase()">{{ foia_request?.status }}</span>
-          · NAICS {{ foia_request?.naics }} · {{ foia_request?.contractType }}
+          <span class="badge" [ngClass]="(foiaRequest?.status || 'draft').toLowerCase()">{{ foiaRequest?.status }}</span>
+          · NAICS {{ foiaRequest?.naics }} · {{ foiaRequest?.contractType }}
         </div>
       </div>
       <div>
-        <a [routerLink]="['/foia_requests', id, 'amendments']"><button class="secondary">Amendments</button></a>
-        <a [routerLink]="['/foia_requests', id, 'qa']"><button class="secondary">Q&amp;A triage</button></a>
-        <a [routerLink]="['/foia_requests', id, 'proposals']"><button class="secondary">Proposals</button></a>
+        <a [routerLink]="['/foiaRequests', id, 'amendments']"><button class="secondary">Amendments</button></a>
+        <a [routerLink]="['/foiaRequests', id, 'qa']"><button class="secondary">Q&amp;A triage</button></a>
+        <a [routerLink]="['/foiaRequests', id, 'proposals']"><button class="secondary">Proposals</button></a>
       </div>
     </div>
 
@@ -86,7 +86,7 @@ import { FIXTURE_SOLICITATIONS } from '../../services/mock-fixtures';
 })
 export class FoiaRequestEditorComponent implements OnInit {
   id = '';
-  foia_request: FoiaRequest | null = null;
+  foiaRequest: FoiaRequest | null = null;
   sectionC = '';
   sectionL = '';
   sectionM = '';
@@ -98,9 +98,9 @@ export class FoiaRequestEditorComponent implements OnInit {
 
   ngOnInit(): void {
     this.id = this.route.snapshot.params['id'];
-    this.foia_request = FIXTURE_SOLICITATIONS.find((s) => s.id === this.id)
+    this.foiaRequest = FIXTURE_SOLICITATIONS.find((s) => s.id === this.id)
       ?? FIXTURE_SOLICITATIONS[0];
-    this.sectionC = `C.1 SCOPE. ${this.foia_request.description}`;
+    this.sectionC = `C.1 SCOPE. ${this.foiaRequest.description}`;
     this.sectionL = 'L.5.2 Volume I (Technical) — 60 pages…';
     this.sectionM = 'M.3.1 Technical Approach (40%)\nM.3.2 Management Approach (25%)\nM.3.3 Past Performance (20%)\nM.3.4 Price (15%)';
   }

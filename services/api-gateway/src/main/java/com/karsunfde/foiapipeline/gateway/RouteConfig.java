@@ -19,19 +19,19 @@ public class RouteConfig {
 
     @Bean
     public RouteLocator routes(RouteLocatorBuilder builder) {
-        String foia_requestUrl = System.getenv().getOrDefault(
+        String foiaRequestUrl = System.getenv().getOrDefault(
             "SOLICITATION_SERVICE_URL", "http://foia-request-service:8081");
-        String redaction_reviewUrl = System.getenv().getOrDefault(
+        String redactionReviewUrl = System.getenv().getOrDefault(
             "EVALUATION_SERVICE_URL", "http://redaction-review-service:8082");
         String aiUrl = System.getenv().getOrDefault(
             "AI_ORCHESTRATOR_URL", "http://ai-orchestrator:8000");
 
         return builder.routes()
-            .route("foia_requests", r -> r.path("/api/foia-requests/**").uri(foia_requestUrl))
-            .route("redaction_reviews",   r -> r.path("/api/redaction-reviews/**").uri(redaction_reviewUrl))
+            .route("foiaRequests", r -> r.path("/api/foia-requests/**").uri(foiaRequestUrl))
+            .route("redactionReviews",   r -> r.path("/api/redaction-reviews/**").uri(redactionReviewUrl))
             .route("ai",            r -> r.path("/api/ai/**").uri(aiUrl))
             // Item 1 — public path forwards to foia-request-service after signature-skip.
-            .route("public",        r -> r.path("/api/public/**").uri(foia_requestUrl))
+            .route("public",        r -> r.path("/api/public/**").uri(foiaRequestUrl))
             .build();
     }
 }
