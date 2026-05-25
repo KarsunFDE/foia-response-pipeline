@@ -53,7 +53,7 @@ your `docs/pair-unique-debt.md`.
 | Repo | What |
 |------|------|
 | [`content`](https://github.com/KarsunFDE/content) | Cohort-facing async content (pre-session, war-room, scenarios) — public |
-| [`domain-knowledge`](https://github.com/KarsunFDE/domain-knowledge) | Federal-acquisitions references (FAR/DFARS, OIG/OMB) — public |
+| [`domain-knowledge`](https://github.com/KarsunFDE/domain-knowledge) | Federal-acquisitions corpus — 11 `/web-research`-sourced briefs. Pair-anchor: [`federal-foia`](https://github.com/KarsunFDE/domain-knowledge/blob/main/federal-foia.md) (5 USC 552, 28 CFR 16, DOJ OIP, B1–B9 exemptions). Public. |
 | `assessment-ec` | Checkpoint exams + audit rubrics — **private, not associate-visible** |
 | `training-resources` | Instructor-facing daily walkthroughs + EOD task specs — **private, not associate-visible** |
 
