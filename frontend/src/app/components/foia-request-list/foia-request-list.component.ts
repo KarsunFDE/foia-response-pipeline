@@ -23,25 +23,25 @@ import { FoiaRequest } from '../../models/foia-request';
   standalone: true,
   imports: [CommonModule, RouterLink],
   template: `
-    <h2>FoiaRequests</h2>
+    <h2>FOIA requests</h2>
     <p>
-      <a routerLink="/foiaRequests/new"><button>+ New foiaRequest</button></a>
+      <a routerLink="/foiaRequests/new"><button>+ New FOIA request</button></a>
     </p>
     <div *ngIf="loading">Loading…</div>
     <div *ngIf="error" style="color: crimson">{{ error }}</div>
     <table *ngIf="!loading && !error">
       <thead>
-        <tr><th>Title</th><th>Agency</th><th>Status</th><th>ID</th></tr>
+        <tr><th>Subject</th><th>Agency</th><th>Status</th><th>Tracking #</th></tr>
       </thead>
       <tbody>
         <tr *ngFor="let s of foiaRequests">
           <td>{{ s.title }}</td>
           <td>{{ s.agencyId }}</td>
           <td>{{ s.status }}</td>
-          <td><code>{{ s.id }}</code></td>
+          <td><code>{{ s.trackingNumber || s.id }}</code></td>
         </tr>
         <tr *ngIf="foiaRequests.length === 0">
-          <td colspan="4"><em>No foiaRequests yet. Create one!</em></td>
+          <td colspan="4"><em>No FOIA requests yet. Create one!</em></td>
         </tr>
       </tbody>
     </table>

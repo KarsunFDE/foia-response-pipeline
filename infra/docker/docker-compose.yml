@@ -80,11 +80,23 @@ services:
       - "8082:8082"
     environment:
       FOIA_REQUEST_SERVICE_URL: http://foia-request-service:8081
+      # Relational audit/reporting datasource (Postgres) — backs the
+      # SearchRepository `foiaRequests` query. Without it the service fails
+      # to boot ("Failed to determine a suitable driver class").
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/foia_response_pipeline
+      SPRING_DATASOURCE_USERNAME: app
+      SPRING_DATASOURCE_PASSWORD: app_dev_password
+      # Mongo document store for RedactionReview (@Document). Other services
+      # set this; it was missing here and defaulted to localhost:27017.
+      MONGO_URL: mongodb://app:app_dev_password@mongodb:27017
+      MONGO_DB: foia_response_pipeline
       # ⚠ DELIBERATE: redaction-review-service calls foia-request-service directly,
       #   not through the gateway — tighter coupling than necessary, and the
       #   call has no circuit breaker (Item 3).
     depends_on:
       - foia-request-service
+      - postgres
+      - mongodb
     # ⚠ no healthcheck
 
   ai-orchestrator:

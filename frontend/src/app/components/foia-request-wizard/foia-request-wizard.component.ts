@@ -3,21 +3,29 @@ import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { Router } from '@angular/router';
 import { FoiaRequestService } from '../../services/foia-request.service';
-import { FoiaRequest, FoiaRequestCreate, FoiaRequestSections } from '../../models/foia-request';
+import {
+  FoiaRequest,
+  FoiaRequestCreate,
+  RequesterType,
+  FeeCategory,
+} from '../../models/foia-request';
 
 /**
- * Multi-step FoiaRequest Drafting Wizard.
+ * Multi-step FOIA Request Intake Wizard (5 USC 552(a)).
  *
- * Steps mirror FAR 15.204 RFP structure (Sections A–M, skipping I).
- * Step 1: Basics (title, agency, NAICS, set-aside, type, ceiling)
- * Step 2: Section C — Statement of Work (AI-drafted via /draft-foia-request)
- * Step 3: Section L — Instructions to Offerors (AI-drafted)
- * Step 4: Section M — RedactionReview Factors
- * Step 5: Review + transition to INTERNAL_REVIEW
+ * Steps mirror the FOIA intake flow, not an RFP build:
+ *   Step 1: Requester (name, org, type) — type derives the fee category
+ *   Step 2: Records sought (description, date range)
+ *   Step 3: Fee category (derived) + fee-waiver toggle
+ *   Step 4: Expedited-processing request + justification
+ *   Step 5: Review + submit to INTAKE_TRIAGE (starts the 20-working-day clock)
+ *
+ * AI-assist (POST /draft-foia-request) drafts the acknowledgement / response
+ * letter — replacing the old Section-C SOW drafter.
  *
  * Touches Item 4 (no Pydantic schema on AI output), Item 5 (legacy
  * LLMChain wired into the AI-orchestrator drafter), Item 9 (no
- * sanitization on description field).
+ * sanitization on the records-sought free-text field — feeds the prompt).
  */
 @Component({
   selector: 'app-foiaRequest-wizard',
@@ -26,8 +34,8 @@ import { FoiaRequest, FoiaRequestCreate, FoiaRequestSections } from '../../model
   template: `
     <div class="page-header">
       <div>
-        <h2>New foiaRequest — drafting wizard</h2>
-        <div class="subtitle">FAR 15.204 Sections A–M · AI-assisted</div>
+        <h2>New FOIA request — intake wizard</h2>
+        <div class="subtitle">5 USC 552(a) · 20-working-day clock starts on submit · AI-assisted</div>
       </div>
     </div>
 
@@ -37,104 +45,102 @@ import { FoiaRequest, FoiaRequestCreate, FoiaRequestSections } from '../../model
             [class.complete]="i < step">{{ i + 1 }}. {{ s }}</span>
     </div>
 
-    <!-- Step 1: Basics -->
+    <!-- Step 1: Requester -->
     <div class="card" *ngIf="step === 0">
-      <h3>1. Basics</h3>
-      <label><span class="label-text">Title</span>
-        <input name="title" [(ngModel)]="model.title" placeholder="e.g., Cloud Managed Services BPA"/>
-      </label>
+      <h3>1. Requester</h3>
+      <p style="font-size:0.85rem;color:var(--color-fg-muted)">
+        ⚠ The requester is an external, potentially adversarial party
+        (inverted threat model). Treat all fields as untrusted input.
+      </p>
       <div class="two-col">
-        <label><span class="label-text">Agency ID</span>
-          <input name="agencyId" [(ngModel)]="model.agencyId" placeholder="GSA-FAS"/>
+        <label><span class="label-text">Requester name</span>
+          <input name="requesterName" [(ngModel)]="model.requesterName" placeholder="e.g., J. Alvarez"/>
         </label>
-        <label><span class="label-text">NAICS</span>
-          <input name="naics" [(ngModel)]="model.naics" placeholder="541512"/>
-        </label>
-        <label><span class="label-text">Set-aside</span>
-          <select name="setAside" [(ngModel)]="model.setAside">
-            <option value="FULL_AND_OPEN">Full and Open</option>
-            <option value="SMALL_BUSINESS">Small Business</option>
-            <option value="8A">8(a)</option>
-            <option value="SDVOSB">SDVOSB</option>
-            <option value="WOSB">WOSB</option>
-            <option value="HUBZONE">HUBZone</option>
-          </select>
-        </label>
-        <label><span class="label-text">Contract type</span>
-          <select name="contractType" [(ngModel)]="model.contractType">
-            <option value="FFP">Firm Fixed Price</option>
-            <option value="CPFF">Cost Plus Fixed Fee</option>
-            <option value="T_AND_M">T&amp;M</option>
-            <option value="IDIQ">IDIQ</option>
-            <option value="BPA">BPA</option>
-          </select>
-        </label>
-        <label><span class="label-text">Notice type</span>
-          <select name="noticeType" [(ngModel)]="model.noticeType">
-            <option value="RFI">RFI</option>
-            <option value="SOURCES_SOUGHT">Sources Sought</option>
-            <option value="RFP">RFP</option>
-            <option value="RFQ">RFQ</option>
-            <option value="COMBINED_SYNOPSIS">Combined Synopsis/FoiaRequest</option>
-          </select>
-        </label>
-        <label><span class="label-text">Ceiling ($)</span>
-          <input name="ceiling" type="number" [(ngModel)]="model.ceilingValue"/>
+        <label><span class="label-text">Organization (if any)</span>
+          <input name="requesterOrg" [(ngModel)]="model.requesterOrg" placeholder="e.g., The Sunlight Beacon"/>
         </label>
       </div>
-      <label><span class="label-text">Description (public-facing)</span>
-        <textarea name="description" rows="4" [(ngModel)]="model.description"
-                  placeholder="Public foiaRequest description (rendered raw — see Debt Item 9)"></textarea>
+      <label><span class="label-text">Requester type (sets fee category — 5 USC 552(a)(4)(A))</span>
+        <select name="requesterType" [(ngModel)]="model.requesterType" (ngModelChange)="onRequesterType()">
+          <option value="commercial">Commercial use</option>
+          <option value="news_media_educational_scientific">News media / educational / scientific</option>
+          <option value="other">Other (incl. individuals)</option>
+        </select>
       </label>
     </div>
 
-    <!-- Step 2: Section C -->
+    <!-- Step 2: Records sought -->
     <div class="card" *ngIf="step === 1">
-      <h3>2. Section C — Statement of Work</h3>
-      <p style="font-size:0.85rem;color:var(--color-fg-muted)">
-        AI-drafted via <code>POST /draft-foia-request</code> (ai-orchestrator).
-        ⚠ Debt Item 4 (no Pydantic schema), Item 5 (legacy LLMChain.run wired here).
+      <h3>2. Records sought</h3>
+      <label><span class="label-text">Short subject line</span>
+        <input name="title" [(ngModel)]="model.title" placeholder="e.g., Deliberative memos on FOIA backlog policy"/>
+      </label>
+      <label><span class="label-text">Description of records sought</span>
+        <textarea name="recordsSought" rows="6" [(ngModel)]="model.recordsSought"
+                  placeholder="Describe the records as specifically as possible (rendered raw — see Debt Item 9)"></textarea>
+      </label>
+      <div class="two-col">
+        <label><span class="label-text">Date range — start</span>
+          <input name="dateRangeStart" type="date" [(ngModel)]="model.dateRangeStart"/>
+        </label>
+        <label><span class="label-text">Date range — end</span>
+          <input name="dateRangeEnd" type="date" [(ngModel)]="model.dateRangeEnd"/>
+        </label>
+      </div>
+      <button class="secondary" (click)="aiDraft('acknowledgement')">▦ AI-draft acknowledgement letter</button>
+      <p style="font-size:0.8rem;color:var(--color-fg-muted)">
+        AI-drafted via <code>POST /draft-foia-request</code>.
+        ⚠ Debt Item 4 (no Pydantic schema), Item 5 (legacy LLMChain wired here).
       </p>
-      <button class="secondary" (click)="aiDraft('sectionC')">▦ AI-draft Section C</button>
-      <textarea name="sectionC" rows="10" [(ngModel)]="sections.sectionC"
-                style="margin-top:0.5rem"></textarea>
+      <textarea *ngIf="draftLetter" name="draftLetter" rows="6" [(ngModel)]="draftLetter" style="margin-top:0.5rem"></textarea>
     </div>
 
-    <!-- Step 3: Section L -->
+    <!-- Step 3: Fee -->
     <div class="card" *ngIf="step === 2">
-      <h3>3. Section L — Instructions to Offerors</h3>
+      <h3>3. Fees</h3>
       <p style="font-size:0.85rem;color:var(--color-fg-muted)">
-        Per AFARS Chapter 9 templates. Page limits, format, submission method.
+        Fee category is derived from requester type (5 USC 552(a)(4)(A)(ii)).
       </p>
-      <button class="secondary" (click)="aiDraft('sectionL')">▦ AI-draft Section L</button>
-      <textarea name="sectionL" rows="10" [(ngModel)]="sections.sectionL"
-                style="margin-top:0.5rem"></textarea>
+      <table>
+        <tbody>
+          <tr><th>Requester type</th><td>{{ model.requesterType }}</td></tr>
+          <tr><th>Derived fee category</th><td><strong>{{ model.feeCategory }}</strong></td></tr>
+          <tr><th>Chargeable</th><td>{{ feeNarrative() }}</td></tr>
+        </tbody>
+      </table>
+      <label style="margin-top:0.75rem">
+        <input type="checkbox" name="feeWaiver" [(ngModel)]="model.feeWaiverRequested" style="width:auto"/>
+        Requester is asking for a fee waiver (public-interest test)
+      </label>
     </div>
 
-    <!-- Step 4: Section M -->
+    <!-- Step 4: Expedited processing -->
     <div class="card" *ngIf="step === 3">
-      <h3>4. Section M — RedactionReview Factors</h3>
-      <p style="font-size:0.85rem;color:var(--color-fg-muted)">
-        FAR 15.305. Factor weights must sum to 100.
-      </p>
-      <textarea name="sectionM" rows="10" [(ngModel)]="sections.sectionM"
-                placeholder="M.3.1 Technical Approach (40%)&#10;M.3.2 Management Approach (25%)&#10;M.3.3 Past Performance (20%)&#10;M.3.4 Price (15%)"></textarea>
+      <h3>4. Expedited processing (5 USC 552(a)(6)(E))</h3>
+      <label>
+        <input type="checkbox" name="expedited" [(ngModel)]="model.expeditedProcessingRequested" style="width:auto"/>
+        Requester is asking for expedited processing
+      </label>
+      <label *ngIf="model.expeditedProcessingRequested"><span class="label-text">Justification (compelling need)</span>
+        <textarea name="expeditedJustification" rows="4" [(ngModel)]="model.expeditedJustification"
+                  placeholder="e.g., imminent threat to life/safety, or urgency to inform the public on a matter of current interest"></textarea>
+      </label>
     </div>
 
     <!-- Step 5: Review -->
     <div class="card" *ngIf="step === 4">
-      <h3>5. Review &amp; submit for internal review</h3>
-      <p>Submitting transitions the foiaRequest to <code>INTERNAL_REVIEW</code>.
-         CO sign-off required before publication.</p>
+      <h3>5. Review &amp; submit to intake triage</h3>
+      <p>Submitting transitions the request to <code>INTAKE_TRIAGE</code> and
+         <strong>starts the 20-working-day statutory clock</strong> (5 USC 552(a)(6)(A)).</p>
       <table>
         <tbody>
-          <tr><th>Title</th><td>{{ model.title || '—' }}</td></tr>
-          <tr><th>Agency / NAICS</th><td>{{ model.agencyId }} / {{ model.naics }}</td></tr>
-          <tr><th>Set-aside / Type</th><td>{{ model.setAside }} / {{ model.contractType }}</td></tr>
-          <tr><th>Ceiling</th><td>\${{ model.ceilingValue?.toLocaleString() || '—' }}</td></tr>
-          <tr><th>Section C length</th><td>{{ (sections.sectionC || '').length }} chars</td></tr>
-          <tr><th>Section L length</th><td>{{ (sections.sectionL || '').length }} chars</td></tr>
-          <tr><th>Section M length</th><td>{{ (sections.sectionM || '').length }} chars</td></tr>
+          <tr><th>Requester</th><td>{{ model.requesterName || '—' }} ({{ model.requesterOrg || 'individual' }})</td></tr>
+          <tr><th>Type / fee category</th><td>{{ model.requesterType }} / {{ model.feeCategory }}</td></tr>
+          <tr><th>Subject</th><td>{{ model.title || '—' }}</td></tr>
+          <tr><th>Records sought</th><td>{{ (model.recordsSought || '').length }} chars</td></tr>
+          <tr><th>Date range</th><td>{{ model.dateRangeStart || '—' }} → {{ model.dateRangeEnd || '—' }}</td></tr>
+          <tr><th>Fee waiver requested</th><td>{{ model.feeWaiverRequested ? 'Yes' : 'No' }}</td></tr>
+          <tr><th>Expedited requested</th><td>{{ model.expeditedProcessingRequested ? 'Yes' : 'No' }}</td></tr>
         </tbody>
       </table>
     </div>
@@ -144,7 +150,7 @@ import { FoiaRequest, FoiaRequestCreate, FoiaRequestSections } from '../../model
       <div>
         <button *ngIf="step < steps.length - 1" (click)="next()">Next →</button>
         <button *ngIf="step === steps.length - 1" (click)="submit()" [disabled]="submitting">
-          {{ submitting ? 'Submitting…' : 'Submit for internal review' }}
+          {{ submitting ? 'Submitting…' : 'Submit to intake triage' }}
         </button>
       </div>
     </div>
@@ -152,24 +158,24 @@ import { FoiaRequest, FoiaRequestCreate, FoiaRequestSections } from '../../model
   `,
 })
 export class FoiaRequestWizardComponent {
-  steps = ['Basics', 'Section C', 'Section L', 'Section M', 'Review'];
+  steps = ['Requester', 'Records sought', 'Fees', 'Expedited', 'Review'];
   step = 0;
   submitting = false;
   error: string | null = null;
+  draftLetter = '';
 
   model: FoiaRequestCreate = {
-    agencyId: 'GSA-FAS',
+    agencyId: 'DOJ-OIP',
     title: '',
-    description: '',
-    status: 'DRAFT',
-    naics: '',
-    setAside: 'FULL_AND_OPEN',
-    contractType: 'FFP',
-    noticeType: 'RFP',
-    ceilingValue: undefined,
+    recordsSought: '',
+    status: 'INTAKE_TRIAGE',
+    requesterName: '',
+    requesterOrg: '',
+    requesterType: 'other',
+    feeCategory: 'other',
+    feeWaiverRequested: false,
+    expeditedProcessingRequested: false,
   };
-
-  sections: FoiaRequestSections = {};
 
   constructor(private svc: FoiaRequestService, private router: Router) {}
 
@@ -181,14 +187,35 @@ export class FoiaRequestWizardComponent {
     if (this.step < this.steps.length - 1) this.step++;
   }
 
-  aiDraft(section: 'sectionC' | 'sectionL'): void {
+  /** Fee category is derived from requester type (5 USC 552(a)(4)(A)(ii)). */
+  onRequesterType(): void {
+    this.model.feeCategory = (this.model.requesterType ?? 'other') as FeeCategory;
+  }
+
+  feeNarrative(): string {
+    switch (this.model.requesterType as RequesterType) {
+      case 'commercial':
+        return 'Search + review + duplication.';
+      case 'news_media_educational_scientific':
+        return 'Duplication only, after the first 100 pages free.';
+      default:
+        return 'Search after the first 2 hours free + duplication after 100 pages free.';
+    }
+  }
+
+  aiDraft(kind: 'acknowledgement'): void {
     // Stubbed — in W2 this hits POST /draft-foia-request through the
     // gateway. For instructor demo, populate plausible placeholder text.
-    if (section === 'sectionC') {
-      this.sections.sectionC = `C.1 SCOPE. The Contractor shall provide enterprise cloud managed services to support ${this.model.agencyId || 'the agency'} mission applications across AWS GovCloud and Azure Government, in accordance with FedRAMP Moderate baseline controls and NIST SP 800-53 Rev. 5.\n\nC.2 BACKGROUND. ${this.model.description || '[description not yet entered]'}\n\nC.3 TASKS.\nTask 1: Service Operations\nTask 2: Continuous Monitoring\nTask 3: Incident Response\n\n[AI-DRAFTED placeholder — to be reviewed by CS / CO before publication. Item 4 / Item 5 surface.]`;
-    } else {
-      this.sections.sectionL = `L.1 GENERAL INSTRUCTIONS. Proposals shall be submitted electronically via SAM.gov by the date and time specified in Section A.\n\nL.5.2 VOLUME I — TECHNICAL. 60-page limit including table of contents; 12-pt Times New Roman; FedRAMP boundary diagrams required.\n\nL.5.3 VOLUME II — PAST PERFORMANCE. Three references within the last 5 years; CPARS extracts accepted.\n\nL.5.4 VOLUME III — PRICE. Fully burdened labor rates by year; option periods priced.\n\n[AI-DRAFTED placeholder.]`;
-    }
+    this.draftLetter =
+      `Dear ${this.model.requesterName || 'Requester'},\n\n` +
+      `This acknowledges receipt of your Freedom of Information Act request ` +
+      `regarding "${this.model.title || '[subject]'}". Your request has been ` +
+      `assigned a tracking number and entered intake triage. Under 5 USC ` +
+      `552(a)(6)(A), the agency will respond within 20 working days; we will ` +
+      `notify you if unusual circumstances require up to 10 additional working ` +
+      `days.\n\nRecords sought: ${this.model.recordsSought || '[description not yet entered]'}\n\n` +
+      `[AI-DRAFTED placeholder — FOIA Officer reviews before sending. ` +
+      `Item 4 / Item 5 surface.]`;
   }
 
   submit(): void {
@@ -196,17 +223,17 @@ export class FoiaRequestWizardComponent {
     this.error = null;
     const payload: FoiaRequestCreate = {
       ...this.model,
-      status: 'INTERNAL_REVIEW',
-      sections: this.sections,
+      status: 'INTAKE_TRIAGE',
+      receivedDate: new Date().toISOString(),
     };
     this.svc.create(payload).subscribe({
       next: (s: FoiaRequest) => {
         this.submitting = false;
-        this.router.navigate(['/foiaRequests', s.id || 'sol-new', 'edit']);
+        this.router.navigate(['/foiaRequests', s.id || 'foia-new', 'edit']);
       },
-      error: (err) => {
+      error: () => {
         // Brownfield reality: create may fail; for instructor demo, still
-        // route to the editor as if it succeeded.
+        // route to the list as if it succeeded.
         this.submitting = false;
         this.router.navigate(['/foiaRequests']);
       },

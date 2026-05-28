@@ -2,17 +2,18 @@ import { Component } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { RouterLink } from '@angular/router';
 import { RoleService } from '../../services/role.service';
-import { FIXTURE_SOLICITATIONS, FIXTURE_AMENDMENTS, FIXTURE_CPARS, FIXTURE_FINDINGS } from '../../services/mock-fixtures';
+import { FIXTURE_SOLICITATIONS } from '../../services/mock-fixtures';
 import { NotificationService } from '../../services/notification.service';
 
 /**
- * Officer Dashboard — role-aware landing for CO / CS / PM / SSA.
+ * FOIA Officer Dashboard — role-aware landing for FOIA Officer / General
+ * Counsel / Records Custodian.
  *
- * Per feature-inventory-target.md: KPI tiles for open foiaRequests,
- * proposals awaiting eval, amendments due, CPARs due in 30 days.
- * Touches Item 8 (hardcoded URL lives in the foiaRequest-list
- * component referenced below) — keeping the localized teaching
- * artifact intact.
+ * KPI tiles for the FOIA pipeline: requests in intake, exemption-analysis
+ * backlog, requests AT STATUTORY RISK (≤5 working days), awaiting HITL
+ * release, and open appeals. The 20-working-day clock is front-and-centre.
+ * Touches Item 8 (hardcoded URL lives in the foiaRequest-list component
+ * referenced below) — keeping the localized teaching artifact intact.
  */
 @Component({
   selector: 'app-officer-dashboard',
@@ -25,46 +26,48 @@ import { NotificationService } from '../../services/notification.service';
         <div class="subtitle">{{ role.current.displayName }} · {{ role.current.authorityNote }}</div>
       </div>
       <div>
-        <a routerLink="/foiaRequests/new"><button>+ New foiaRequest</button></a>
+        <a routerLink="/foiaRequests/new"><button>+ New FOIA request</button></a>
       </div>
     </div>
 
     <section class="kpi-grid">
       <div class="kpi-tile">
-        <div class="kpi-value">{{ openFoiaRequests() }}</div>
-        <div class="kpi-label">Open foiaRequests</div>
+        <div class="kpi-value">{{ inIntake() }}</div>
+        <div class="kpi-label">In intake triage</div>
       </div>
       <div class="kpi-tile">
-        <div class="kpi-value">{{ proposalsAwaitingEval() }}</div>
-        <div class="kpi-label">Proposals awaiting eval</div>
+        <div class="kpi-value">{{ exemptionBacklog() }}</div>
+        <div class="kpi-label">Exemption-analysis backlog</div>
+      </div>
+      <div class="kpi-tile" style="border-left-color: var(--color-accent)">
+        <div class="kpi-value">{{ atStatutoryRisk() }}</div>
+        <div class="kpi-label">⏱ At statutory risk (≤ 5 wd)</div>
       </div>
       <div class="kpi-tile">
-        <div class="kpi-value">{{ amendmentsPending() }}</div>
-        <div class="kpi-label">Amendments unack'd</div>
+        <div class="kpi-value">{{ awaitingRelease() }}</div>
+        <div class="kpi-label">Awaiting HITL release</div>
       </div>
       <div class="kpi-tile">
-        <div class="kpi-value">{{ cparsDue() }}</div>
-        <div class="kpi-label">CPARs due ≤ 30 d</div>
-      </div>
-      <div class="kpi-tile">
-        <div class="kpi-value">{{ openFindings() }}</div>
-        <div class="kpi-label">Open OIG findings</div>
+        <div class="kpi-value">{{ openAppeals() }}</div>
+        <div class="kpi-label">Open appeals</div>
       </div>
     </section>
 
     <div class="two-col">
       <div class="card">
-        <h3>Workload pipeline</h3>
+        <h3>Request pipeline (20-working-day clock)</h3>
         <table>
-          <thead><tr><th>FoiaRequest</th><th>State</th><th>Due</th></tr></thead>
+          <thead><tr><th>Request</th><th>State</th><th>Due</th></tr></thead>
           <tbody>
             <tr *ngFor="let s of pipeline()">
               <td>
                 <a [routerLink]="['/foiaRequests', s.id, 'edit']">{{ s.title }}</a>
-                <div style="font-size:0.75rem;color:var(--color-fg-muted)">{{ s.noticeType }} · NAICS {{ s.naics }}</div>
+                <div style="font-size:0.75rem;color:var(--color-fg-muted)">{{ s.trackingNumber }} · {{ s.requesterType }}</div>
               </td>
               <td><span class="badge" [ngClass]="(s.status || '').toLowerCase()">{{ s.status }}</span></td>
-              <td>{{ s.proposalsDueAt ? (s.proposalsDueAt | date:'mediumDate') : '—' }}</td>
+              <td [style.color]="workingDaysLeft(s.dueDate) !== null && workingDaysLeft(s.dueDate)! <= 5 ? 'var(--color-accent-dark)' : ''">
+                {{ dueDisplay(s.dueDate) }}
+              </td>
             </tr>
           </tbody>
         </table>
@@ -84,9 +87,8 @@ import { NotificationService } from '../../services/notification.service';
     <div class="card" style="margin-top:1rem">
       <h3>Quick links</h3>
       <p>
-        <a routerLink="/foiaRequests">All foiaRequests</a> ·
+        <a routerLink="/foiaRequests">All FOIA requests</a> ·
         <a routerLink="/reports">All reports</a> ·
-        <a routerLink="/vendors">Vendor directory</a> ·
         <a routerLink="/admin/audit">Audit log search</a>
       </p>
       <p style="font-size:0.8rem;color:var(--color-fg-muted)">
@@ -106,26 +108,51 @@ export class OfficerDashboardComponent {
     return `${time}, ${this.role.current.displayName.split(' ')[0]}`;
   }
 
-  openFoiaRequests(): number {
+  /** Working days until `dueDate` (negative = overdue); null if unset. */
+  workingDaysLeft(dueDate?: string): number | null {
+    if (!dueDate) return null;
+    const due = new Date(dueDate);
+    const now = new Date();
+    let days = 0;
+    const cursor = new Date(now);
+    while (cursor < due) {
+      cursor.setDate(cursor.getDate() + 1);
+      const d = cursor.getDay();
+      if (d !== 0 && d !== 6) days++;
+    }
+    return due < now ? -days : days;
+  }
+
+  dueDisplay(dueDate?: string): string {
+    const n = this.workingDaysLeft(dueDate);
+    if (n === null) return '—';
+    if (n < 0) return `${-n} wd OVERDUE`;
+    return `${n} wd`;
+  }
+
+  inIntake(): number {
+    return FIXTURE_SOLICITATIONS.filter((s) => s.status === 'INTAKE_TRIAGE').length;
+  }
+
+  exemptionBacklog(): number {
     return FIXTURE_SOLICITATIONS.filter((s) =>
-      ['PUBLISHED', 'AMENDED', 'INTERNAL_REVIEW'].includes(s.status as string),
+      ['EXEMPTION_ANALYSIS', 'REDACTION_PROPOSAL'].includes(s.status as string),
     ).length;
   }
 
-  proposalsAwaitingEval(): number {
-    return 3; // matches FIXTURE_PROPOSALS count
+  atStatutoryRisk(): number {
+    return FIXTURE_SOLICITATIONS.filter((s) => {
+      const n = this.workingDaysLeft(s.dueDate);
+      return n !== null && n <= 5;
+    }).length;
   }
 
-  amendmentsPending(): number {
-    return FIXTURE_AMENDMENTS.filter((a) => a.requiresAcknowledgement && a.acknowledgedBy.length < 3).length;
+  awaitingRelease(): number {
+    return FIXTURE_SOLICITATIONS.filter((s) => s.status === 'HITL_REVIEW').length;
   }
 
-  cparsDue(): number {
-    return FIXTURE_CPARS.filter((c) => c.status !== 'PUBLISHED').length;
-  }
-
-  openFindings(): number {
-    return FIXTURE_FINDINGS.filter((f) => ['OPEN', 'EVIDENCE_REQUESTED', 'IN_REMEDIATION'].includes(f.status)).length;
+  openAppeals(): number {
+    return FIXTURE_SOLICITATIONS.filter((s) => s.status === 'APPEAL').length;
   }
 
   pipeline() {

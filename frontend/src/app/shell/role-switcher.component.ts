@@ -2,7 +2,7 @@ import { Component } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { Router } from '@angular/router';
-import { ROLE_PROFILES } from '../models/roles';
+import { PERSONA_SWITCHER_PROFILES } from '../models/roles';
 import { Role } from '../models/roles';
 import { RoleService } from '../services/role.service';
 
@@ -28,7 +28,8 @@ import { RoleService } from '../services/role.service';
   `,
 })
 export class RoleSwitcherComponent {
-  profiles = ROLE_PROFILES;
+  // FOIA personas + Root + Unauthenticated (acquisition personas excluded — see roles.ts).
+  profiles = PERSONA_SWITCHER_PROFILES;
 
   constructor(public role: RoleService, private router: Router) {}
 
@@ -37,6 +38,13 @@ export class RoleSwitcherComponent {
     // Redirect to a role-appropriate landing page so the screen-access
     // pattern is visible to instructor + cohort.
     const landing: Record<Role, string> = {
+      // — FOIA roles —
+      foia_officer: '/dashboard',
+      general_counsel: '/dashboard',
+      records_custodian: '/dashboard',
+      requester: '/foiaRequests',
+      oip_oversight: '/admin/audit',
+      // — LEGACY acquisition roles —
       contracting_officer: '/dashboard',
       contract_specialist: '/dashboard',
       program_manager: '/dashboard',

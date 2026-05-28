@@ -6,11 +6,12 @@ import { FoiaRequestService } from '../../services/foia-request.service';
 import { FoiaRequestCreate } from '../../models/foia-request';
 
 /**
- * New-foiaRequest form.
+ * Quick new-FOIA-request form (single page; the full intake flow is the wizard).
  *
  * ⚠ DELIBERATE — Item 8 reinforcement / Item 9 reinforcement:
- *   - The `description` textarea has NO maxlength, NO required validator,
- *     NO HTML-strip on submit. Pairs with backend Item 9 (raw HTML accepted).
+ *   - The `recordsSought` textarea has NO maxlength, NO required validator,
+ *     NO HTML-strip on submit. Pairs with backend Item 9 (raw HTML accepted —
+ *     records-sought text feeds the ai-orchestrator prompt).
  *   - `title` field has no `required` or `minlength` — empty title submits.
  *   - `agencyId` is a free-text input; should be a dropdown of the user's
  *     authorized agencies.
@@ -20,21 +21,26 @@ import { FoiaRequestCreate } from '../../models/foia-request';
   standalone: true,
   imports: [CommonModule, FormsModule],
   template: `
-    <h2>New foiaRequest</h2>
+    <h2>New FOIA request</h2>
     <form (ngSubmit)="onSubmit()" #form="ngForm">
       <p>
-        <label>Title<br>
+        <label>Subject line<br>
           <input name="title" [(ngModel)]="model.title"/>
         </label>
       </p>
       <p>
-        <label>Agency ID<br>
+        <label>Requester name<br>
+          <input name="requesterName" [(ngModel)]="model.requesterName"/>
+        </label>
+      </p>
+      <p>
+        <label>Agency / component<br>
           <input name="agencyId" [(ngModel)]="model.agencyId"/>
         </label>
       </p>
       <p>
-        <label>Description<br>
-          <textarea name="description" [(ngModel)]="model.description" rows="6"></textarea>
+        <label>Records sought<br>
+          <textarea name="recordsSought" [(ngModel)]="model.recordsSought" rows="6"></textarea>
         </label>
       </p>
       <p>
@@ -50,8 +56,11 @@ export class FoiaRequestCreateComponent {
   model: FoiaRequestCreate = {
     agencyId: '',
     title: '',
-    description: '',
-    status: 'DRAFT',
+    recordsSought: '',
+    requesterName: '',
+    requesterType: 'other',
+    feeCategory: 'other',
+    status: 'INTAKE_TRIAGE',
   };
   submitting = false;
   error: string | null = null;

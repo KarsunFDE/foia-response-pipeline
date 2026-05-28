@@ -16,51 +16,59 @@ interface NavGroup {
 }
 
 const ALL_AUTHENTICATED: Role[] = [
+  'foia_officer', 'general_counsel', 'records_custodian', 'oip_oversight',
   'contracting_officer', 'contract_specialist', 'program_manager',
   'ssa', 'evaluator', 'vendor', 'oig_reviewer', 'sys_admin',
 ];
 
+const FOIA_STAFF: Role[] = ['foia_officer', 'general_counsel', 'records_custodian'];
+
+// FOIA workflow: INTAKE_TRIAGE → EXEMPTION_ANALYSIS → REDACTION_PROPOSAL →
+// HITL_REVIEW → RESPONSE → APPEAL (domain-mapping.md). Links stay on the
+// existing app.routes.ts paths — no route paths were added or changed. Stages
+// without a dedicated route (Responses / Appeals) point at the relevant
+// /foiaRequests/:id/edit record so the workflow is navigable today; the pair
+// adds purpose-built routes in W4–W5.
 const NAV: NavGroup[] = [
   {
-    title: 'Workspace',
+    title: 'Requests',
     links: [
-      { label: 'Officer Dashboard', route: '/dashboard', roles: ['contracting_officer', 'contract_specialist', 'program_manager', 'ssa'] },
-      { label: 'Evaluator Workspace', route: '/redactionReview/workspace', roles: ['evaluator', 'contracting_officer'] },
-      { label: 'Vendor Portal', route: '/vendor/proposals', roles: ['vendor'] },
+      { label: 'Officer Dashboard', route: '/dashboard', roles: [...FOIA_STAFF, 'oip_oversight'] },
+      { label: 'Request Index', route: '/foiaRequests', roles: [...FOIA_STAFF, 'oip_oversight', 'requester'] },
+      { label: 'New Request', route: '/foiaRequests/new', roles: FOIA_STAFF },
     ],
   },
   {
-    title: 'FoiaRequests',
+    title: 'Exemption Analysis',
     links: [
-      { label: 'FoiaRequests Index', route: '/foiaRequests', roles: ['contracting_officer', 'contract_specialist', 'program_manager'] },
-      { label: 'New FoiaRequest', route: '/foiaRequests/new', roles: ['contracting_officer', 'contract_specialist'] },
-      { label: 'Public Opportunity Search', route: '/public/opportunities', roles: [] },
+      { label: 'Exemption Queue', route: '/redactionReviews', roles: ['foia_officer', 'general_counsel', 'records_custodian'] },
     ],
   },
   {
-    title: 'Source Selection',
+    title: 'Redaction Review',
     links: [
-      { label: 'Consensus + SSDD', route: '/redactionReview/eval-0142/consensus', roles: ['ssa', 'contracting_officer'] },
+      { label: 'Consensus Review', route: '/redactionReview/rr-0142/consensus', roles: ['foia_officer', 'general_counsel'] },
     ],
   },
   {
-    title: 'Post-Award',
+    title: 'Responses',
     links: [
-      { label: 'Award Record', route: '/awards/aw-2026-001', roles: ['contracting_officer', 'program_manager', 'vendor'] },
-      { label: 'Contract Admin', route: '/contracts/ctr-0001/admin', roles: ['contracting_officer', 'program_manager'] },
-      { label: 'CPAR Reviews', route: '/contracts/ctr-0001/cpars', roles: ['contracting_officer', 'program_manager', 'vendor'] },
+      // RESPONSE-stage record (release determination) — existing /foiaRequests/:id/edit route.
+      { label: 'Release Responses', route: '/foiaRequests/foia-2026-0203/edit', roles: ['foia_officer', 'general_counsel'] },
+    ],
+  },
+  {
+    title: 'Appeals',
+    links: [
+      // APPEAL-stage record — existing /foiaRequests/:id/edit route.
+      { label: 'Appeals Queue', route: '/foiaRequests/foia-2026-0418/edit', roles: ['foia_officer', 'general_counsel', 'oip_oversight'] },
     ],
   },
   {
     title: 'Reports',
     links: [
-      { label: 'All Reports', route: '/reports', roles: ['contracting_officer', 'program_manager', 'ssa', 'sys_admin', 'oig_reviewer'] },
-    ],
-  },
-  {
-    title: 'Vendors',
-    links: [
-      { label: 'Vendor Directory', route: '/vendors', roles: ['contracting_officer', 'contract_specialist', 'evaluator', 'program_manager'] },
+      { label: 'FOIA Reports', route: '/reports', roles: [...FOIA_STAFF, 'oip_oversight', 'sys_admin', 'oig_reviewer'] },
+      { label: 'Audit Log', route: '/admin/audit', roles: [...FOIA_STAFF, 'oip_oversight', 'sys_admin', 'oig_reviewer'] },
     ],
   },
   {
@@ -68,8 +76,21 @@ const NAV: NavGroup[] = [
     links: [
       { label: 'User & Role Admin', route: '/admin/users', roles: ['sys_admin'] },
       { label: 'System Config', route: '/admin/config', roles: ['sys_admin'] },
-      { label: 'Audit Log Search', route: '/admin/audit', roles: ['sys_admin', 'oig_reviewer'] },
       { label: 'OIG Findings Tracker', route: '/admin/findings', roles: ['sys_admin', 'oig_reviewer'] },
+    ],
+  },
+  // — Legacy (pre-FOIA) acquisition nav — orphaned sections with no FOIA
+  // mapping yet. Retained, not deleted; the pair repurposes/removes in W4–W5.
+  {
+    title: 'Legacy (pre-FOIA)',
+    links: [
+      { label: 'Public Opportunity Search', route: '/public/opportunities', roles: [] },
+      { label: 'Evaluator Workspace', route: '/redactionReview/workspace', roles: ['evaluator', 'contracting_officer'] },
+      { label: 'Vendor Portal', route: '/vendor/proposals', roles: ['vendor'] },
+      { label: 'Vendor Directory', route: '/vendors', roles: ['contracting_officer', 'contract_specialist', 'evaluator', 'program_manager'] },
+      { label: 'Award Record', route: '/awards/aw-2026-001', roles: ['contracting_officer', 'program_manager', 'vendor'] },
+      { label: 'Contract Admin', route: '/contracts/ctr-0001/admin', roles: ['contracting_officer', 'program_manager'] },
+      { label: 'CPAR Reviews', route: '/contracts/ctr-0001/cpars', roles: ['contracting_officer', 'program_manager', 'vendor'] },
     ],
   },
 ];

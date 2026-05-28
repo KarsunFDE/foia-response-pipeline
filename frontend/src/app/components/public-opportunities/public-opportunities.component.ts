@@ -97,7 +97,7 @@ export class PublicOpportunitiesComponent {
   filtered(): FoiaRequest[] {
     const q = this.q.toLowerCase();
     return FIXTURE_SOLICITATIONS.filter((s) => {
-      if (q && !s.title.toLowerCase().includes(q) && !s.description.toLowerCase().includes(q)) return false;
+      if (q && !s.title.toLowerCase().includes(q) && !(s.recordsSought ?? s.description ?? '').toLowerCase().includes(q)) return false;
       if (this.naics && s.naics !== this.naics) return false;
       if (this.noticeType && s.noticeType !== this.noticeType) return false;
       if (this.setAside && s.setAside !== this.setAside) return false;

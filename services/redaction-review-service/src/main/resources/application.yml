@@ -4,6 +4,18 @@ server:
 spring:
   application:
     name: redaction-review-service
+  # Relational audit/reporting datasource (Postgres). The SearchRepository
+  # queries the `foiaRequests` table here. Defaults target the local
+  # docker-compose postgres:16 (DB foia_response_pipeline / user app).
+  datasource:
+    url: ${SPRING_DATASOURCE_URL:jdbc:postgresql://localhost:5432/foia_response_pipeline}
+    username: ${SPRING_DATASOURCE_USERNAME:app}
+    password: ${SPRING_DATASOURCE_PASSWORD:app_dev_password}
+  # Run schema.sql + data.sql against the datasource on startup so the
+  # foiaRequests table exists for the (deliberately vulnerable) search query.
+  sql:
+    init:
+      mode: always
   data:
     mongodb:
       uri: ${MONGO_URL:mongodb://app:app_dev_password@localhost:27017}

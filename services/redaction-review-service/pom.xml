@@ -47,6 +47,16 @@
       <groupId>org.springframework.boot</groupId>
       <artifactId>spring-boot-starter-jdbc</artifactId>
     </dependency>
+    <!-- Runtime JDBC driver for the relational audit/reporting table the
+         SearchRepository queries (Postgres side). Without a runtime driver the
+         service fails to boot ("Failed to determine a suitable driver class").
+         The injection debt (sec-sql-string-concat-aspect-search) is unchanged —
+         this only makes the vulnerable query runnable. -->
+    <dependency>
+      <groupId>org.postgresql</groupId>
+      <artifactId>postgresql</artifactId>
+      <scope>runtime</scope>
+    </dependency>
     <dependency>
       <groupId>com.h2database</groupId>
       <artifactId>h2</artifactId>

@@ -20,7 +20,8 @@ import { RoleService } from './services/role.service';
     <div class="app-shell">
       <header class="topbar">
         <div>
-          <h1>foia-response-pipeline
+          <h1>FOIA Response Pipeline
+            <span class="domain-badge">FOIA</span>
             <span class="agency-badge" *ngIf="role.current.agencyId">{{ role.current.agencyId }}</span>
           </h1>
         </div>

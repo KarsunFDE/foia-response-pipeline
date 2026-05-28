@@ -8,14 +8,15 @@ import { environment } from '../../../environments/environment';
   standalone: true,
   imports: [CommonModule],
   template: `
-    <h2>RedactionReview panels</h2>
+    <h2>Redaction review</h2>
     <p>
       <em>
-        Stub view. RedactionReview panel UI is part of W3 cohort work — multi-agent
-        coordination + HITL interrupt nodes.
+        Stub view. The redaction-review UI (exemption proposal → reviewer
+        challenge → HITL release/withhold) is part of W3 cohort work —
+        multi-agent coordination + HITL interrupt nodes on irreversible release.
       </em>
     </p>
-    <button (click)="createPanel()">Create stub redactionReview panel</button>
+    <button (click)="createPanel()">Create stub redaction review</button>
     <pre *ngIf="result">{{ result | json }}</pre>
     <p *ngIf="error" style="color: crimson">{{ error }}</p>
   `,

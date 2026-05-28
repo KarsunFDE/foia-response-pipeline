@@ -1,83 +1,183 @@
 /**
  * Instructor-demo fixtures.
  *
- * The foia-response-pipeline backend endpoints listed in feature-inventory-target.md
- * are scaffold-level; many return empty or 404 against the current
- * legacy stack. To keep instructor-driven demos showing realistic
- * federal-acquisitions data even without a fully populated DB, every
- * page falls back to these fixtures on HTTP error.
+ * The foia-response-pipeline backend endpoints are scaffold-level; many
+ * return empty or 404 against the current legacy stack. To keep
+ * instructor-driven demos showing realistic FOIA-processing data even
+ * without a fully populated DB, every page falls back to these fixtures on
+ * HTTP error.
  *
- * Realism citations (all retrieved 2026-05-22 via /web-research):
- *   - SAM.gov opportunity record shape (NAICS, set-aside, posted_at)
- *   - DLA DIBBS foiaRequest IDs (`SPE…` prefix convention)
- *   - GSA-FAS contract numbers (`GS-35F-…`)
- *   - CPARS rating bands per FAR 42.1503 (Exceptional → Unsatisfactory)
+ * Realism citations (FOIA — retrieved 2026-05-28 via /web-research):
+ *   - FOIA.gov tracking-number convention + requester types
+ *   - 5 USC 552(a)(6)(A) — 20-working-day response clock
+ *   - 5 USC 552(a)(4)(A)(ii) — commercial / news-media-edu-sci / other fee categories
+ *   - 5 USC 552(b)(1)–(b)(9) — the nine exemptions
+ *
+ * NOTE: the `FIXTURE_SOLICITATIONS` / `FIXTURE_EVALUATION` export NAMES are
+ * kept (acquisition-era) so the 19 inherited components still import them;
+ * the DATA inside is now FOIA. The pair renames the exports in W4–W5.
  */
 
 import { FoiaRequest, FoiaRequestState } from '../models/foia-request';
 import { Amendment } from '../models/amendment';
 import { Qna } from '../models/qna';
 import { Proposal } from '../models/proposal';
-import { RedactionReview, RedactionReviewScore } from '../models/redaction-review';
+import {
+  RedactionReview,
+  RedactionReviewScore,
+  LegacyTepReview,
+} from '../models/redaction-review';
 import { Award, ContractModification, Deliverable, Cpar } from '../models/award';
 import { Vendor } from '../models/vendor';
 import { AuditEvent } from '../models/audit';
 import { Finding } from '../models/finding';
 
+/** + N working days from now, as an ISO date (approx — ignores holidays). */
+function plusWorkingDays(n: number): string {
+  const d = new Date();
+  let added = 0;
+  while (added < n) {
+    d.setDate(d.getDate() + 1);
+    const day = d.getDay();
+    if (day !== 0 && day !== 6) added++;
+  }
+  return d.toISOString();
+}
+
+/** Sample FOIA requests — one per requester type + an at-risk + an appeal. */
 export const FIXTURE_SOLICITATIONS: FoiaRequest[] = [
   {
-    id: 'sol-0142',
-    agencyId: 'GSA-FAS',
-    title: 'Cloud Managed Services BPA — Civilian Agencies',
-    description: 'Enterprise cloud managed services across AWS GovCloud + Azure Government for 11 civilian agencies under the GSA-FAS umbrella.',
-    status: 'PUBLISHED' as FoiaRequestState,
-    naics: '541512',
-    setAside: 'FULL_AND_OPEN',
-    contractType: 'BPA',
-    ceilingValue: 110_000_000,
-    noticeType: 'RFP',
-    proposalsDueAt: new Date(Date.now() + 1000 * 60 * 60 * 24 * 14).toISOString(),
-    createdAt: new Date(Date.now() - 1000 * 60 * 60 * 24 * 21).toISOString(),
+    id: 'foia-2026-0142',
+    trackingNumber: 'DOJ-2026-0142',
+    agencyId: 'DOJ-OIP',
+    title: 'Deliberative memos on FOIA backlog policy',
+    recordsSought:
+      'All inter- and intra-agency memoranda discussing the 2025 FOIA backlog-reduction policy, including draft guidance circulated for comment.',
+    status: 'EXEMPTION_ANALYSIS' as FoiaRequestState,
+    requesterName: 'J. Alvarez',
+    requesterOrg: 'The Sunlight Beacon (news outlet)',
+    requesterType: 'news_media_educational_scientific',
+    feeCategory: 'news_media_educational_scientific',
+    feeWaiverRequested: true,
+    expeditedProcessingRequested: false,
+    dateRangeStart: '2025-01-01',
+    dateRangeEnd: '2025-12-31',
+    receivedDate: new Date(Date.now() - 1000 * 60 * 60 * 24 * 14).toISOString(),
+    dueDate: plusWorkingDays(6),
+    createdAt: new Date(Date.now() - 1000 * 60 * 60 * 24 * 14).toISOString(),
   },
   {
-    id: 'sol-0203',
-    agencyId: 'GSA-FAS',
-    title: 'Acquisition Modernization Software Engineering',
-    description: 'AI-assisted modernization engineering team to support CAMEO/COMET portfolio.',
-    status: 'PUBLISHED' as FoiaRequestState,
-    naics: '541511',
-    setAside: '8A',
-    contractType: 'T_AND_M',
-    ceilingValue: 25_000_000,
-    noticeType: 'RFP',
-    proposalsDueAt: new Date(Date.now() + 1000 * 60 * 60 * 24 * 7).toISOString(),
-    createdAt: new Date(Date.now() - 1000 * 60 * 60 * 24 * 35).toISOString(),
-  },
-  {
-    id: 'sol-0301',
-    agencyId: 'GSA-FAS',
-    title: 'Sources Sought — Zero-Trust Architecture Assessment',
-    description: 'RFI seeking industry input on zero-trust assessments for FedRAMP Moderate enclaves.',
-    status: 'PUBLISHED' as FoiaRequestState,
-    naics: '541519',
-    setAside: 'SDVOSB',
-    contractType: 'FFP',
-    ceilingValue: 1_500_000,
-    noticeType: 'SOURCES_SOUGHT',
+    id: 'foia-2026-0203',
+    trackingNumber: 'DOJ-2026-0203',
+    agencyId: 'DOJ-OIP',
+    title: 'Vendor pricing in cloud-services contract files',
+    recordsSought:
+      'Unit-pricing tables and proprietary cost narratives submitted by the awardee of contract GS-35F-0001V.',
+    status: 'REDACTION_PROPOSAL' as FoiaRequestState,
+    requesterName: 'Initech Research LLC',
+    requesterOrg: 'Initech Research LLC',
+    requesterType: 'commercial',
+    feeCategory: 'commercial',
+    feeWaiverRequested: false,
+    expeditedProcessingRequested: false,
+    dateRangeStart: '2023-01-01',
+    dateRangeEnd: '2024-06-30',
+    receivedDate: new Date(Date.now() - 1000 * 60 * 60 * 24 * 9).toISOString(),
+    dueDate: plusWorkingDays(11),
     createdAt: new Date(Date.now() - 1000 * 60 * 60 * 24 * 9).toISOString(),
   },
   {
-    id: 'sol-0418',
-    agencyId: 'GSA-FAS',
-    title: 'Draft — Multi-Cloud Observability Stack Procurement',
-    description: 'Pre-publication draft. Internal review pending.',
-    status: 'INTERNAL_REVIEW' as FoiaRequestState,
-    naics: '541519',
-    setAside: 'FULL_AND_OPEN',
-    contractType: 'IDIQ',
-    ceilingValue: 50_000_000,
-    noticeType: 'RFP',
-    createdAt: new Date(Date.now() - 1000 * 60 * 60 * 24 * 3).toISOString(),
+    id: 'foia-2026-0301',
+    trackingNumber: 'DOJ-2026-0301',
+    agencyId: 'DOJ-OIP',
+    title: 'Records re: agency response to public-records audit',
+    recordsSought:
+      'Correspondence between the agency CIO and OIP concerning the FY25 records-management audit findings.',
+    status: 'INTAKE_TRIAGE' as FoiaRequestState,
+    requesterName: 'M. Okafor',
+    requesterOrg: 'Private citizen',
+    requesterType: 'other',
+    feeCategory: 'other',
+    feeWaiverRequested: false,
+    expeditedProcessingRequested: true,
+    expeditedJustification:
+      'Pending litigation deadline; records are time-sensitive to an upcoming hearing.',
+    receivedDate: new Date(Date.now() - 1000 * 60 * 60 * 24 * 19).toISOString(),
+    // ⚠ at statutory risk — due in 1 working day.
+    dueDate: plusWorkingDays(1),
+    createdAt: new Date(Date.now() - 1000 * 60 * 60 * 24 * 19).toISOString(),
+  },
+  {
+    id: 'foia-2026-0418',
+    trackingNumber: 'DOJ-2026-0418',
+    agencyId: 'DOJ-OIP',
+    title: 'Appeal — partial denial of law-enforcement records',
+    recordsSought:
+      'Appeal of the partial denial in DOJ-2026-0095; requester challenges the (b)(7)(C) withholdings.',
+    status: 'APPEAL' as FoiaRequestState,
+    requesterName: 'Civic Transparency Project',
+    requesterOrg: 'Civic Transparency Project (watchdog)',
+    requesterType: 'news_media_educational_scientific',
+    feeCategory: 'news_media_educational_scientific',
+    feeWaiverRequested: true,
+    expeditedProcessingRequested: false,
+    receivedDate: new Date(Date.now() - 1000 * 60 * 60 * 24 * 4).toISOString(),
+    dueDate: plusWorkingDays(16),
+    disposition: 'partial_grant',
+    createdAt: new Date(Date.now() - 1000 * 60 * 60 * 24 * 4).toISOString(),
+  },
+];
+
+/** Sample exemption-driven redaction reviews (the FOIA review shape). */
+export const FIXTURE_REDACTION_REVIEWS: RedactionReview[] = [
+  {
+    id: 'rr-0142',
+    foiaRequestId: 'foia-2026-0142',
+    agencyId: 'DOJ-OIP',
+    documentRef: 'doc-0142-backlog-memo-v3.pdf',
+    proposedRedactions: [
+      {
+        id: 'pr-1',
+        segmentRef: 'p.4 ¶2–3',
+        exemptions: ['(b)(5)'],
+        rationale:
+          'Pre-decisional draft recommendation; deliberative-process privilege applies (5 USC 552(b)(5)).',
+      },
+      {
+        id: 'pr-2',
+        segmentRef: 'p.7 signature block',
+        exemptions: ['(b)(6)'],
+        rationale:
+          'Personal cell number of a staff attorney; clearly unwarranted privacy invasion (b)(6).',
+      },
+    ],
+    reviewerRole: 'general_counsel',
+    state: 'UNDER_REVIEW',
+    releaseDecision: null,
+    appealable: true,
+    createdAt: new Date(Date.now() - 1000 * 60 * 60 * 24 * 2).toISOString(),
+    decidedAt: null,
+  },
+  {
+    id: 'rr-0203',
+    foiaRequestId: 'foia-2026-0203',
+    agencyId: 'DOJ-OIP',
+    documentRef: 'doc-0203-pricing-tables.xlsx',
+    proposedRedactions: [
+      {
+        id: 'pr-3',
+        segmentRef: 'Tab "Unit Pricing" cols D–H',
+        exemptions: ['(b)(4)'],
+        rationale:
+          'Confidential commercial pricing; substantial competitive harm on release (5 USC 552(b)(4)).',
+      },
+    ],
+    reviewerRole: 'foia_officer',
+    state: 'PROPOSED',
+    releaseDecision: null,
+    appealable: true,
+    createdAt: new Date(Date.now() - 1000 * 60 * 60 * 24).toISOString(),
+    decidedAt: null,
   },
 ];
 
@@ -184,9 +284,11 @@ export const FIXTURE_PROPOSALS: Proposal[] = [
   },
 ];
 
-export const FIXTURE_EVALUATION: RedactionReview = {
+// ⚠ LEGACY (acquisition-era TEP) — feeds the inherited evaluator-workspace /
+// consensus-ssdd demo only. The FOIA review fixtures are FIXTURE_REDACTION_REVIEWS.
+export const FIXTURE_EVALUATION: LegacyTepReview = {
   id: 'eval-0142',
-  foiaRequestId: 'sol-0142',
+  foiaRequestId: 'foia-2026-0142',
   panelMembers: ['ev-allen', 'ev-mendez', 'ev-park'],
   factors: [
     { id: 'f-tech', name: 'Technical Approach', weight: 40, sectionM: 'M.3.1' },
@@ -285,10 +387,10 @@ export const FIXTURE_VENDORS: Vendor[] = [
 ];
 
 export const FIXTURE_AUDIT_EVENTS: AuditEvent[] = [
-  { id: 'ae-001', actorId: 'co-reeves', actorName: 'Dana Reeves', agencyId: 'GSA-FAS', action: 'SOLICITATION.PUBLISH', objectType: 'FoiaRequest', objectId: 'sol-0142', correlationId: 'r-abc-001', before: { status: 'READY_TO_PUBLISH' }, after: { status: 'PUBLISHED' }, ts: new Date(Date.now() - 1000 * 60 * 60 * 24 * 7).toISOString() },
-  { id: 'ae-002', actorId: 'co-reeves', actorName: 'Dana Reeves', agencyId: 'GSA-FAS', action: 'AMENDMENT.ISSUE', objectType: 'Amendment', objectId: 'am-0001', correlationId: 'r-abc-002', before: null, after: { number: 1 }, ts: new Date(Date.now() - 1000 * 60 * 60 * 24 * 5).toISOString() },
-  { id: 'ae-003', actorId: 'cs-ortiz', actorName: 'Miguel Ortiz', agencyId: 'GSA-FAS', action: 'QNA.ANSWER', objectType: 'Qna', objectId: 'qa-001', correlationId: 'r-def-001', before: { status: 'AWAITING_CO_APPROVAL' }, after: { status: 'PUBLISHED' }, ts: new Date(Date.now() - 1000 * 60 * 60 * 22).toISOString() },
-  { id: 'ae-004', actorId: 'ssa-whitfield', actorName: 'Col. Whitfield', agencyId: 'GSA-FAS', action: 'SSDD.SIGN', objectType: 'RedactionReview', objectId: 'eval-0142', correlationId: 'r-ghi-001', before: { state: 'AWAITING_SSA_SIGNATURE' }, after: { state: 'AWARDED' }, ts: new Date(Date.now() - 1000 * 60 * 60 * 24 * 30).toISOString() },
+  { id: 'ae-001', actorId: 'fo-reeves', actorName: 'Dana Reeves', agencyId: 'DOJ-OIP', action: 'FOIA_REQUEST.INTAKE', objectType: 'FoiaRequest', objectId: 'foia-2026-0142', correlationId: 'r-abc-001', before: null, after: { status: 'INTAKE_TRIAGE' }, ts: new Date(Date.now() - 1000 * 60 * 60 * 24 * 14).toISOString() },
+  { id: 'ae-002', actorId: 'fo-reeves', actorName: 'Dana Reeves', agencyId: 'DOJ-OIP', action: 'EXEMPTION.PROPOSE', objectType: 'RedactionReview', objectId: 'rr-0142', correlationId: 'r-abc-002', before: null, after: { exemptions: ['(b)(5)', '(b)(6)'] }, ts: new Date(Date.now() - 1000 * 60 * 60 * 24 * 2).toISOString() },
+  { id: 'ae-003', actorId: 'gc-whitfield', actorName: 'Col. Whitfield', agencyId: 'DOJ-OIP', action: 'RELEASE.DETERMINE', objectType: 'RedactionReview', objectId: 'rr-0203', correlationId: 'r-def-001', before: { state: 'UNDER_REVIEW' }, after: { releaseDecision: 'release_partial' }, ts: new Date(Date.now() - 1000 * 60 * 60 * 22).toISOString() },
+  { id: 'ae-004', actorId: 'gc-whitfield', actorName: 'Col. Whitfield', agencyId: 'DOJ-OIP', action: 'APPEAL.OPEN', objectType: 'FoiaRequest', objectId: 'foia-2026-0418', correlationId: 'r-ghi-001', before: { disposition: 'partial_grant' }, after: { status: 'APPEAL' }, ts: new Date(Date.now() - 1000 * 60 * 60 * 24 * 4).toISOString() },
 ];
 
 export const FIXTURE_FINDINGS: Finding[] = [
