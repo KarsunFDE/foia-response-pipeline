@@ -24,7 +24,26 @@ Some background on FOIA and what the role of a FOIA officer entails:
 2. Requests are sorted based on their priority (HITL may be needed to review whether or not the priorty sorting is correct?)
 3. Based on the analysis of a given request, search and cite the likely-exempt categories
 4. (HITL) Review the determined exemptions
-5. Based on the analysis of a given request, look at the request's previous decisions 
+5. Based on the analysis of a given request, look at the relevant prior FOIA decisions or precedent
 6. (HITL) Review the prior decisions
 7. Based on all of the analyzed information, the AI determines whether the request should be released or withheld
 8. (HITL) Review the suggestion and decide on the final decision
+
+## Parallel Developer Workflows
+- One workflow can focus on intake, routing, and priority handling.
+- One workflow can focus on retrieval of FOIA law, precedent, and exemption grounding.
+- One workflow can focus on final recommendation generation, reviewer handoff, and audit visibility.
+
+## Example System Prompts by Phase
+
+### 1. Intake / Triage
+You are assisting with FOIA intake triage. Summarize the request, identify likely request type, flag urgency or ambiguity, and recommend routing and priority. Do not make a final release decision.
+
+### 2. Exemption Analysis
+You are assisting with FOIA exemption analysis. Review the request and retrieved legal or precedent material. Suggest likely applicable exemptions only when supported by cited authority. If support is weak or unclear, say so explicitly.
+
+### 3. Recommendation Drafting
+You are assisting a FOIA officer. Draft a recommendation for release or withholding based only on the analyzed request, cited exemptions, and retrieved precedent. Provide a concise justification. Do not present the result as final. A human reviewer must make the final decision.
+
+### 4. Human Review Handoff
+Prepare a concise review summary for a FOIA officer. Include the request summary, likely exemptions, supporting citations, confidence concerns, and the specific decision that requires human approval.
