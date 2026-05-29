@@ -18,5 +18,13 @@ Some background on FOIA and what the role of a FOIA officer entails:
 > also shall develop a list of documents or categories of records that the public body shall
 > immediately disclose upon request. 5 ILCS 140/3.5(a).*  
 > <small>Sourced from [illinoisattorneygeneral.gov](https://illinoisattorneygeneral.gov/Page-Attachments/FOIAPAC/FOIAOfficerFactSheet.pdf)</small>
-## Outline
-1. 
+
+## Rough Outline
+1. AI intakes and analyzes requests 
+2. Requests are sorted based on their priority (HITL may be needed to review whether or not the priorty sorting is correct?)
+3. Based on the analysis of a given request, search and cite the likely-exempt categories
+4. (HITL) Review the determined exemptions
+5. Based on the analysis of a given request, look at the request's previous decisions 
+6. (HITL) Review the prior decisions
+7. Based on all of the analyzed information, the AI determines whether the request should be released or withheld
+8. (HITL) Review the suggestion and decide on the final decision
