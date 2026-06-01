@@ -15,14 +15,15 @@ FOIA officers review incoming requests, identify responsive records, coordinate 
 
 
 ## Rough Outline
-1. AI intakes and analyzes requests 
-2. Requests are sorted based on their priority (HITL may be needed to review whether or not the priorty sorting is correct?)
-3. Based on the analysis of a given request, search and cite the likely-exempt categories
-4. (HITL) Review the determined exemptions
-5. Based on the analysis of a given request, look at the relevant prior FOIA decisions or precedent
-6. (HITL) Review the prior decisions
-7. Based on all of the analyzed information, the AI generates a recommendation for disposition, supporting rationale, and citations for HITL review
-8. (HITL) Review the suggestion and decide on the final decision
+1. AI intakes and analyzes requests
+2. Requests are sorted based on priority, with HITL review available if prioritization is uncertain or disputed
+3a. Retrieve relevant federal FOIA authority, likely exemption categories, and supporting source material
+3b. Analyze the request against the retrieved authority and source material
+4. (HITL Gate) Review proposed exemptions only after retrieval is complete, with cited authority, source snippets, and confidence visible
+5. Retrieve and review relevant prior FOIA decisions or precedent tied to the scoped request
+6. (HITL Gate) Review the prior decisions or precedent, and if scope is corrected or rejected, loop back through retrieval and analysis using the approved snapshot and prompt version
+7. Based on the approved retrieved material, precedent, and gate outputs, the AI generates a recommendation for disposition, supporting rationale, citations, and confidence for HITL review
+8. (HITL) Review the recommendation and decide the final disposition; if retrieval is missing, below threshold, or insufficiently grounded, escalate rather than silently continue
 
 ## Decision Controls
 
