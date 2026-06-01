@@ -11,13 +11,8 @@ The sponsor mandate, as received:
 
 Some background on FOIA and what the role of a FOIA officer entails:
 
-> *The Freedom of Information Act (FOIA) requires that all public bodies designate one or more
-> officials or employees to act as a Freedom of Information Act Officer (FOIA Officer). These
-> FOIA Officers (or their designees) shall receive requests for records, ensure that the public body
-> responds to the requests in a timely fashion, and issue responses under FOIA. The FOIA Officer
-> also shall develop a list of documents or categories of records that the public body shall
-> immediately disclose upon request. 5 ILCS 140/3.5(a).*  
-> <small>Sourced from [illinoisattorneygeneral.gov](https://illinoisattorneygeneral.gov/Page-Attachments/FOIAPAC/FOIAOfficerFactSheet.pdf)</small>
+FOIA officers review incoming requests, identify responsive records, coordinate searches, assess applicable federal FOIA exemptions, and support legally compliant responses within statutory timelines.
+
 
 ## Rough Outline
 1. AI intakes and analyzes requests 
@@ -26,8 +21,37 @@ Some background on FOIA and what the role of a FOIA officer entails:
 4. (HITL) Review the determined exemptions
 5. Based on the analysis of a given request, look at the relevant prior FOIA decisions or precedent
 6. (HITL) Review the prior decisions
-7. Based on all of the analyzed information, the AI determines whether the request should be released or withheld
+7. Based on all of the analyzed information, the AI generates a recommendation for disposition, supporting rationale, and citations for HITL review
 8. (HITL) Review the suggestion and decide on the final decision
+
+## Decision Controls
+
+- The system must not auto-release or auto-withhold any request.
+- All final dispositions require human review and approval before any requester-facing action is taken.
+- The system may generate recommendations, citations, and draft rationale, but it may not execute a final release decision.
+
+## Recommendation Outcomes
+
+- Full release
+- Partial release with redactions
+- Full withholding
+- No responsive records
+- Glomar response when legally applicable
+- Referral or consultation with another agency or component
+- Request for clarification or narrowing
+- Administrative closure when procedurally required
+
+- Any recommendation involving withholding or redaction must include:
+  - cited exemption basis
+  - foreseeable harm rationale when applicable
+  - segregability analysis
+  - supporting precedent or source authority
+
+## Audit Logging
+
+- Record an append-only audit trail for each request.
+- Log prompt version, retrieved sources, recommendation output, reviewer actions, final disposition, and timestamps.
+- Preserve sufficient detail to support reconstruction for oversight, including OIP or OIG review.
 
 ## Parallel Developer Workflows
 - One workflow can focus on intake, routing, and priority handling.
