@@ -1,7 +1,7 @@
 # ADR 0003 — Retrieval Baseline for Phase 1
 
 Status: Proposed
-Date: 2025-06-01
+Date: 2026-06-01
 
 ## Context
 
