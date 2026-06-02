@@ -27,14 +27,14 @@
 
 ### Chunking/indexing
 
-- Define chunk boundaries by FAR sections/paragraphs and preserve context.
+- Define chunk boundaries by FOIA sections/paragraphs and preserve context.
 - Create an indexing pipeline that writes chunk metadata and source identifiers.
 - Build a reindex command for updated corpus content.
 
 ### Hybrid retrieval integration
 
 - Wire LangChain v1.0 to `MongoDBAtlasHybridSearchRetriever`.
-- Configure retrieval queries against the FAR corpus index.
+- Configure retrieval queries against the FOIA corpus index.
 - Verify the retriever returns chunk IDs and source metadata.
 
 ### Reranking or ranking logic
@@ -45,7 +45,7 @@
 
 ### Grounding/citation propagation
 
-- Attach source identifiers and FAR references to every retrieved chunk.
+- Attach source identifiers and FOIA references to every retrieved chunk.
 - Propagate grounding metadata through recommendation and HITL flows.
 - Prevent any evidence output from being returned without source context.
 
@@ -70,7 +70,7 @@
 ## 4. Acceptance Criteria
 
 - Corpus ingestion pipeline exists and ingests `docs/reference/foia/` with source metadata.
-- Chunks are indexed with source IDs and preserved FAR context.
+- Chunks are indexed with source IDs and preserved FOIA context.
 - LangChain v1.0 uses `MongoDBAtlasHybridSearchRetriever` successfully.
 - Retrieved results include grounding metadata and citations.
 - HITL gate blocks auto-release and logs reviewer actions.
@@ -85,6 +85,6 @@
 
 ## 6. Open Questions
 
-- What are the exact document update/reindex triggers for the FAR corpus?
+- What are the exact document update/reindex triggers for the FOIA corpus?
 - How should retrieval confidence thresholds be defined for escalation?
 - What review metadata must be stored for downstream audit analysis?

@@ -21,26 +21,26 @@ LangChain v1.0 is the integration layer. The system needs a retriever that suppo
 
 ## Rationale
 
-Hybrid retrieval provides a practical balance between semantic recall and exact-match grounding for regulatory/legal content in the FAR corpus. It is a stronger baseline than pure sparse or pure dense retrieval, while still fitting the current LangChain v1.0 and Atlas tooling.
+Hybrid retrieval provides a practical balance between semantic recall and exact-match grounding for regulatory/legal content in the FOIA corpus. It is a stronger baseline than pure sparse or pure dense retrieval, while still fitting the current LangChain v1.0 and Atlas tooling.
 
 Titan v2 at 512 dims is a reasonable embedding baseline for Phase 1 because it is specific, compact, and matches the project’s current model expectations without inventing a more advanced or unvalidated embedding scheme.
 
-A local managed corpus keeps control over the source material and avoids premature dependence on external document stores. The FAR XML corpus under `docs/reference/far/` is the authoritative reference for grounding and audit logs.
+A local managed corpus keeps control over the source material and avoids premature dependence on external document stores. The FOIA corpus under `docs/reference/foia/` is the authoritative reference for grounding and audit logs.
 
 Using Atlas Local now enables fast developer iteration while preserving the same Atlas-compatible retrieval approach for a later Cloud Atlas rollout.
 
 ## Consequences
 
 - The Phase 1 retrieval pipeline is anchored to a hybrid Atlas retriever and embedder baseline rather than a custom or experimental retrieval architecture.
-- The repo’s reference data remains explicit and auditable in `docs/reference/far/`, simplifying traceability from output to source document.
+- The repo’s reference data remains explicit and auditable in `docs/reference/foia/`, simplifying traceability from output to source document.
 - Downstream recommendation, redaction, and HITL workflows must retain grounding/citation metadata from the retriever output.
 - Migration to Atlas Cloud later will be a technology lift rather than a design pivot, since the same retrieval pattern is already in place.
 
 ## Alternatives Considered
 
-1. Pure sparse retrieval over FAR XML. Rejected because it would lose semantic recall and make grounding-only behavior harder to support across the legal corpus.
+1. Pure sparse retrieval over FOIA authority set. Rejected because it would lose semantic recall and make grounding-only behavior harder to support across the legal corpus.
 2. Pure dense retrieval with a different embedding model. Rejected because it would reduce auditability and introduce a less practical baseline for Phase 1.
-3. External managed reference store instead of a local corpus. Rejected for Phase 1 because a local managed FAR XML corpus is simpler to control and easier to audit during early brownfield modernization.
+3. External managed reference store instead of a local corpus. Rejected for Phase 1 because a local managed FOIA corpus is simpler to control and easier to audit during early brownfield modernization.
 
 ## Follow-up Work
 

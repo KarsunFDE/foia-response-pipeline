@@ -16,7 +16,7 @@ Define the Phase 1 retrieval approach for the FOIA response pipeline. The plan a
 - LangChain v1.0 is the integration layer.
 - Atlas Local is the development target; Atlas Cloud is the future target.
 - No auto-release behavior: human review is required before any response decision.
-- Corpus is static, authoritative FAR XML under `docs/reference/far/`.
+- Corpus is static, authoritative FOIA authority set under `docs/reference/foia/`.
 
 ## 4. Baseline Architecture Decisions
 
@@ -28,20 +28,20 @@ Define the Phase 1 retrieval approach for the FOIA response pipeline. The plan a
 ## 5. Corpus Boundaries and Metadata
 
 - Corpus boundaries are the FOIA authority set files in `docs/reference/foia/`.
-- Metadata includes document source, section identifiers, and any parsed FAR headings.
+- Metadata includes document source, section identifiers, and any parsed FOIA headings.
 - Reference corpus is read-only for retrieval and auditability.
 - Any document updates must be tracked and reindexed explicitly.
 
 ## 6. Chunking Strategy
 
-- Chunk by logical FAR section or paragraph boundaries, preserving regulatory context.
+- Chunk by logical FOIA section or paragraph boundaries, preserving regulatory context.
 - Keep chunks small enough for precise grounding but large enough to preserve meaning.
 - Include source identifiers and chunk positions in each indexed record.
 
 ## 7. Retrieval Strategy
 
 - Use hybrid retrieval to combine semantic and exact-match signals.
-- Query the Atlas Hybrid Search retriever against the FAR corpus.
+- Query the Atlas Hybrid Search retriever against the FOIA corpus.
 - Prefer retriever output that includes document source and chunk-level identifiers.
 
 ## 8. Reranking Strategy
@@ -52,7 +52,7 @@ Define the Phase 1 retrieval approach for the FOIA response pipeline. The plan a
 
 ## 9. Grounding and Citation Requirements
 
-- Every retrieved item must include a source identifier and the original FAR reference.
+- Every retrieved item must include a source identifier and the original FOIA reference.
 - Grounding metadata must be available to HITL reviewers and audit logs.
 - Do not return ungrounded or hallucinated content as evidence.
 
@@ -65,19 +65,19 @@ Define the Phase 1 retrieval approach for the FOIA response pipeline. The plan a
 ## 11. Security and Access Control
 
 - Restrict retrieval access to the service runtime and authorized review workflows.
-- Keep the FAR reference corpus under repo-managed control; do not expose raw corpus paths to end users.
+- Keep the FOIA reference corpus under repo-managed control; do not expose raw corpus paths to end users.
 - Ensure any Atlas credentials used for Local or Cloud access are stored securely.
 
 ## 12. Observability and Evaluation
 
 - Track retrieval confidence, result counts, and query latency.
 - Log citations returned for each recommendation and review action.
-- Evaluate quality against representative retrieval scenarios and FAR lookup expectations.
+- Evaluate quality against representative retrieval scenarios and FOIA lookup expectations.
 
 ## 13. Implementation Task Breakdown
 
 - Configure LangChain v1.0 with `MongoDBAtlasHybridSearchRetriever`.
-- Build the indexing process for FAR XML under `docs/reference/far/`.
+- Build the indexing process for FOIA under `docs/reference/foia/`.
 - Implement Titan v2 512-d embedding generation.
 - Add citation and grounding metadata to indexed chunks.
 - Wire retrieval results into HITL and recommendation flows.
@@ -86,12 +86,12 @@ Define the Phase 1 retrieval approach for the FOIA response pipeline. The plan a
 ## 14. Acceptance Criteria
 
 - Retrieval uses `MongoDBAtlasHybridSearchRetriever` and Titan v2 512-d embeddings.
-- Source corpus is derived from `docs/reference/far/` and returns chunk-level citations.
+- Source corpus is derived from `docs/reference/foia/` and returns chunk-level citations.
 - Low-confidence queries trigger escalation, not auto-release.
 - Logs capture retrieval confidence, citations, and failure conditions.
 
 ## 15. Open Questions
 
-- What exact chunk size and boundary rules should be used for FAR XML sections?
+- What exact chunk size and boundary rules should be used for FOIA authority set sections?
 - How will Atlas Cloud schema/config differ from Atlas Local for hybrid retrieval?
 - What cadence will the reference corpus be updated and reindexed?
