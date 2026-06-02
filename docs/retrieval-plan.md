@@ -6,7 +6,11 @@ Define the Phase 1 retrieval approach for the FOIA response pipeline. The plan a
 
 ## 2. Scope
 
+<<<<<<< HEAD
 - Retrieval for retrieval-relevant reference content derived from FOIA authority set.
+=======
+- Retrieval for retrieval-relevant reference content derived from FOIA authority sources.
+>>>>>>> ce84300 (docs: align retrieval plan to FOIA corpus)
 - Baseline search and evidence delivery for recommendation, redaction, and HITL review flows.
 - Support for citations, confidence, escalation, and later migration to Atlas Cloud.
 
@@ -16,7 +20,11 @@ Define the Phase 1 retrieval approach for the FOIA response pipeline. The plan a
 - LangChain v1.0 is the integration layer.
 - Atlas Local is the development target; Atlas Cloud is the future target.
 - No auto-release behavior: human review is required before any response decision.
+<<<<<<< HEAD
 - Corpus is static, authoritative FOIA authority set under `docs/reference/foia/`.
+=======
+- Corpus is static, authoritative FOIA sources under \docs/reference/foia/`.`
+>>>>>>> ce84300 (docs: align retrieval plan to FOIA corpus)
 
 ## 4. Baseline Architecture Decisions
 
