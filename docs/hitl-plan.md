@@ -11,20 +11,64 @@ The sponsor mandate, as received:
 
 Some background on FOIA and what the role of a FOIA officer entails:
 
-> *The Freedom of Information Act (FOIA) requires that all public bodies designate one or more
-> officials or employees to act as a Freedom of Information Act Officer (FOIA Officer). These
-> FOIA Officers (or their designees) shall receive requests for records, ensure that the public body
-> responds to the requests in a timely fashion, and issue responses under FOIA. The FOIA Officer
-> also shall develop a list of documents or categories of records that the public body shall
-> immediately disclose upon request. 5 ILCS 140/3.5(a).*  
-> <small>Sourced from [illinoisattorneygeneral.gov](https://illinoisattorneygeneral.gov/Page-Attachments/FOIAPAC/FOIAOfficerFactSheet.pdf)</small>
+FOIA officers review incoming requests, identify responsive records, coordinate searches, assess applicable federal FOIA exemptions, and support legally compliant responses within statutory timelines.
+
 
 ## Rough Outline
-1. AI intakes and analyzes requests 
-2. Requests are sorted based on their priority (HITL may be needed to review whether or not the priorty sorting is correct?)
-3. Based on the analysis of a given request, search and cite the likely-exempt categories
-4. (HITL) Review the determined exemptions
-5. Based on the analysis of a given request, look at the request's previous decisions 
-6. (HITL) Review the prior decisions
-7. Based on all of the analyzed information, the AI determines whether the request should be released or withheld
-8. (HITL) Review the suggestion and decide on the final decision
+1. AI intakes and analyzes requests
+2. Requests are sorted based on priority, with HITL review available if prioritization is uncertain or disputed
+3a. Retrieve relevant federal FOIA authority, likely exemption categories, and supporting source material
+3b. Analyze the request against the retrieved authority and source material
+4. (HITL Gate) Review proposed exemptions only after retrieval is complete, with cited authority, source snippets, and confidence visible
+5. Retrieve and review relevant prior FOIA decisions or precedent tied to the scoped request
+6. (HITL Gate) Review the prior decisions or precedent, and if scope is corrected or rejected, loop back through retrieval and analysis using the approved snapshot and prompt version
+7. Based on the approved retrieved material, precedent, and gate outputs, the AI generates a recommendation for disposition, supporting rationale, citations, and confidence for HITL review
+8. (HITL) Review the recommendation and decide the final disposition; if retrieval is missing, below threshold, or insufficiently grounded, escalate rather than silently continue
+
+## Decision Controls
+
+- The system must not auto-release or auto-withhold any request.
+- All final dispositions require human review and approval before any requester-facing action is taken.
+- The system may generate recommendations, citations, and draft rationale, but it may not execute a final release decision.
+
+## Recommendation Outcomes
+
+- Full release
+- Partial release with redactions
+- Full withholding
+- No responsive records
+- Glomar response when legally applicable
+- Referral or consultation with another agency or component
+- Request for clarification or narrowing
+- Administrative closure when procedurally required
+
+- Any recommendation involving withholding or redaction must include:
+  - cited exemption basis
+  - foreseeable harm rationale when applicable
+  - segregability analysis
+  - supporting precedent or source authority
+
+## Audit Logging
+
+- Record an append-only audit trail for each request.
+- Log prompt version, retrieved sources, recommendation output, reviewer actions, final disposition, and timestamps.
+- Preserve sufficient detail to support reconstruction for oversight, including OIP or OIG review.
+
+## Parallel Developer Workflows
+- One workflow can focus on intake, routing, and priority handling.
+- One workflow can focus on retrieval of FOIA law, precedent, and exemption grounding.
+- One workflow can focus on final recommendation generation, reviewer handoff, and audit visibility.
+
+## Example System Prompts by Phase
+
+### 1. Intake / Triage
+You are assisting with FOIA intake triage. Summarize the request, identify likely request type, flag urgency or ambiguity, and recommend routing and priority. Do not make a final release decision.
+
+### 2. Exemption Analysis
+You are assisting with FOIA exemption analysis. Review the request and retrieved legal or precedent material. Suggest likely applicable exemptions only when supported by cited authority. If support is weak or unclear, say so explicitly.
+
+### 3. Recommendation Drafting
+You are assisting a FOIA officer. Draft a recommendation for release or withholding based only on the analyzed request, cited exemptions, and retrieved precedent. Provide a concise justification. Do not present the result as final. A human reviewer must make the final decision.
+
+### 4. Human Review Handoff
+Prepare a concise review summary for a FOIA officer. Include the request summary, likely exemptions, supporting citations, confidence concerns, and the specific decision that requires human approval.
