@@ -7,7 +7,7 @@ Date: 2026-06-01
 
 This repo is a Phase 1 brownfield modernization of the FOIA response pipeline. The first retrieval baseline must be practical, grounded, auditable, and human-in-the-loop rather than a perfect long-term architecture.
 
-The source corpus is managed locally from FAR XML under `docs/reference/far/`. Phase 1 development uses MongoDB Atlas Local, with the expectation that Atlas Cloud will be adopted later for production-scale retrieval.
+The source corpus is managed locally from FOIA authority set under `docs/reference/foia/`. Phase 1 development uses MongoDB Atlas Local, with the expectation that Atlas Cloud will be adopted later for production-scale retrieval.
 
 LangChain v1.0 is the integration layer. The system needs a retriever that supports hybrid search quality and explicit grounding / citation behavior for auditability.
 
@@ -15,7 +15,7 @@ LangChain v1.0 is the integration layer. The system needs a retriever that suppo
 
 - Use `MongoDBAtlasHybridSearchRetriever` as the Phase 1 baseline retriever.
 - Use Titan v2 embeddings at 512 dimensions as the embedding baseline.
-- Keep source documents as a managed local reference corpus derived from FAR XML in `docs/reference/far/`.
+- Keep source documents as a managed local reference corpus derived from FOIA authority set in `docs/reference/foia/`.
 - Start with MongoDB Atlas Local for development, and plan a migration path to MongoDB Atlas Cloud later.
 - Carry grounding, citations, and auditability forward into downstream recommendation and HITL steps.
 

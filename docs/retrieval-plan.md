@@ -6,7 +6,7 @@ Define the Phase 1 retrieval approach for the FOIA response pipeline. The plan a
 
 ## 2. Scope
 
-- Retrieval for retrieval-relevant reference content derived from FAR XML.
+- Retrieval for retrieval-relevant reference content derived from FOIA authority set.
 - Baseline search and evidence delivery for recommendation, redaction, and HITL review flows.
 - Support for citations, confidence, escalation, and later migration to Atlas Cloud.
 
@@ -27,7 +27,7 @@ Define the Phase 1 retrieval approach for the FOIA response pipeline. The plan a
 
 ## 5. Corpus Boundaries and Metadata
 
-- Corpus boundaries are the FAR XML files in `docs/reference/far/`.
+- Corpus boundaries are the FOIA authority set files in `docs/reference/foia/`.
 - Metadata includes document source, section identifiers, and any parsed FAR headings.
 - Reference corpus is read-only for retrieval and auditability.
 - Any document updates must be tracked and reindexed explicitly.

@@ -21,7 +21,7 @@
 
 ### Corpus ingestion and metadata
 
-- Parse FAR XML files from `docs/reference/far/` into a managed ingestion pipeline.
+- Parse FOIA authority set files from `docs/reference/foia/` into a managed ingestion pipeline.
 - Extract source metadata: document name, section ID, heading, and raw path.
 - Validate ingested corpus records against the reference file set.
 
@@ -69,7 +69,7 @@
 
 ## 4. Acceptance Criteria
 
-- Corpus ingestion pipeline exists and ingests `docs/reference/far/` with source metadata.
+- Corpus ingestion pipeline exists and ingests `docs/reference/foia/` with source metadata.
 - Chunks are indexed with source IDs and preserved FAR context.
 - LangChain v1.0 uses `MongoDBAtlasHybridSearchRetriever` successfully.
 - Retrieved results include grounding metadata and citations.
@@ -78,7 +78,7 @@
 
 ## 5. Dependencies
 
-- `docs/reference/far/` corpus must be available and parsed.
+- `docs/reference/foia/` corpus must be available and parsed.
 - MongoDB Atlas Local must be configured for hybrid retrieval.
 - LangChain v1.0 integration layer must be available in the service stack.
 - HITL workflow and review UI must support citation display.
