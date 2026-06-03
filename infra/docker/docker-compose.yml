@@ -109,6 +109,7 @@ services:
       AWS_REGION: us-east-1
       BEDROCK_MODEL_ID: anthropic.claude-3-7-sonnet-20250219-v1:0
       MONGO_URL: mongodb://app:app_dev_password@mongodb:27017
+      MONGO_DB: foia_response_pipeline
     # ⚠ DELIBERATE: no AWS creds wired — relies on shared dev IAM role being
     #   mounted via ~/.aws/credentials. The Bedrock stub returns mock data
     #   so it works without real creds. First-day learners discover this and

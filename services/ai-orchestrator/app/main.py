@@ -59,6 +59,7 @@ except ImportError:
 from app import legacy_chain  # noqa: F401 — imported to keep the v0.x entry
                                 # point reachable; cohort grep finds the seam.
 from app.bedrock_client import invoke_model, BEDROCK_MODEL_ID, AWS_REGION
+from app import atlas_retriever
 
 # ⚠ DELIBERATE — no correlation-ID in the log format (Item 6).
 logging.basicConfig(
@@ -250,18 +251,11 @@ def rag_clause_search(req: ClauseSearchRequest) -> dict[str, Any]:
     """
     log.info("rag/clause-search query=%r far_part=%r top_k=%d",
              req.query[:60], req.far_part, req.top_k)
-    # ⚠ Atlas Vector Search call would land here; stub returns a shaped
-    # response so the surface flows.
+    hits = atlas_retriever.clause_search(req.query, top_k=req.top_k)
     bedrock = invoke_model(
         f"Summarize FOIA statute / regulation relevant to: {req.query}",
         system="You retrieve 5 USC 552 / 28 CFR 16 provisions; cite section IDs.",
     )
-    hits = [
-        {"clause_id": "5USC552-a6A", "title": "Time limits — 20 working days",
-         "score": 0.91, "far_part": "5 USC 552"},
-        {"clause_id": "5USC552-b5", "title": "Deliberative-process privilege",
-         "score": 0.87, "far_part": "5 USC 552"},
-    ][: req.top_k]
     return {
         "query": req.query,
         "hits": hits,
