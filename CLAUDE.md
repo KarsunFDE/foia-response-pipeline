@@ -113,7 +113,18 @@ Locked items must **stay broken** until their unlock week.
 | `obs-error-rethrown-stack-lost` | `ai-orchestrator/app/foia_request_service.py` | W5 |
 | `ai-bedrock-no-cost-limit` | `ai-orchestrator/app/cost_guard.py` (no-op stub) | W5 |
 
-⚠ **CI config is duplicated**: `.github/workflows/ci.yml` (the one GitHub Actions actually runs) and `infra/github-actions/ci.yml` (legacy mirror referenced by README/docs) are byte-identical. Item 12 lives in both; keep them in sync.
+⚠ **CI config is duplicated**: `.github/workflows/ci.yml` (the one GitHub Actions actually runs) and `infra/github-actions/ci.yml` (legacy mirror referenced by README/docs) are byte-identical. Item 12 lives in both; keep them in sync. (The mirror covers only `ci.yml` + `deploy.yml` — `debt-enforcement.yml` and `pr-summary-check.yml` below are not mirrored.)
+
+## CI & PR Conventions
+
+`.github/workflows/` runs four workflows:
+
+- **`ci.yml`** — build + test (Item 12 lint step commented out, keep so).
+- **`debt-enforcement.yml`** — split-out gate (runs parallel to `ci.yml`). Fails the PR if a locked debt item's locked-failing test starts passing without a lockfile update, if `docs/debt-lockfile.yml` is mutated without the `debt-touch-approved` label, or if the PR template's debt-touch checkbox contradicts the lockfile diff. Mirrors `make verify-debt-locks`.
+- **`pr-summary-check.yml`** — fails the PR unless the `## Summary` section is non-empty **and** names changed files as backtick-quoted `` `path/to/file` `` tokens (the "Files touched" list). Placeholder/comment-only summaries fail.
+- **`deploy.yml`**.
+
+When opening a PR: fill `## Summary` with the explicit changes + a backtick-quoted file list, pick a debt-touch checkbox (default **NO**), and add an ADR under `docs/adrs/` if the PR touches a debt item. See `.github/pull_request_template.md`.
 
 ## Technology Stack Notes
 
@@ -125,3 +136,14 @@ Locked items must **stay broken** until their unlock week.
 ## Corpus & Domain
 
 FOIA statutory basis: 5 USC 552, 28 CFR 16 (DOJ regs), B1–B9 exemption categories. Seed corpus in `data/seed/foia-precedent/` — uploaded to Atlas Vector Search (index `foia_precedent`) in W2. Workflow stages: intake-triage → exemption-analysis → redaction-proposal → hitl-review → response → appeal.
+
+> Note: ADR 0004 proposes relocating the corpus to `docs/reference/foia/` as the canonical path; until that lands, `data/seed/foia-precedent/` is the live location.
+
+## Phase 1 Planning Docs
+
+Phase 1 (AI adoption) is planned in `docs/`, captured as ADRs:
+
+- **PRD** — `docs/prd/phase-1-ai-adoption.md` (problem/goals/boundaries; the *what/why*).
+- **HITL plan** — `docs/hitl-plan.md` (gate placement, recommendation outcomes, audit logging).
+- **Retrieval plan** — `docs/retrieval-plan.md`; **task breakdown** — `docs/implementation-task-breakdown.md`.
+- **ADRs** — `docs/adrs/`: `0001` aspect commitment, `0001` microservices, `0002` Bedrock anchor, `0003` retrieval baseline (hybrid Atlas retriever + Titan v2 @ 512 dims), `0004` corpus chunking/ingestion + index schema. Add an ADR for any modernization or retrieval-design decision.
