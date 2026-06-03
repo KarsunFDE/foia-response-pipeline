@@ -6,7 +6,7 @@ Define the Phase 1 retrieval approach for the FOIA response pipeline. The plan a
 
 ## 2. Scope
 
-- Retrieval for retrieval-relevant reference content derived from FOIA authority set.
+- Retrieval for retrieval-relevant reference content derived from FOIA authority sources.
 - Baseline search and evidence delivery for recommendation, redaction, and HITL review flows.
 - Support for citations, confidence, escalation, and later migration to Atlas Cloud.
 
