@@ -47,3 +47,6 @@ yarn-error.log
 *.log
 logs/
 data/seed/foia-precedent-chunks.jsonl
+
+# --- AI assistant local config ---
+CLAUDE.md
