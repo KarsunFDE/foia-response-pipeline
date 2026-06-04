@@ -360,9 +360,60 @@ def test_split_by_paragraphs_no_chunk_exceeds_budget_on_real_corpus():
     # The b-exemptions file historically carried a single 1236-char paragraph
     # that passed through whole; every chunk must now stay within the budget.
     repo_root = Path(__file__).resolve().parents[3]
-    path = repo_root / "data" / "seed" / "foia-precedent" / "5usc552-b-exemptions.md"
+    path = repo_root / "docs" / "reference" / "foia" / "5usc552-b-exemptions.md"
     assert path.exists(), f"corpus file not found at {path}"
     chunks = idx.chunk_file(path)
     assert chunks, "expected at least one chunk"
     for c in chunks:
         assert len(c["text"]) <= idx.MAX_SECTION_CHARS
+
+
+# ---------------------------------------------------------------------------
+# Corpus-coverage validation (ingestion gate)
+# ---------------------------------------------------------------------------
+
+def _chunk(source_file: str, chunk_index: int = 0, text: str = "body") -> dict:
+    return {"source_file": source_file, "chunk_index": chunk_index, "text": text}
+
+
+def test_validate_corpus_coverage_clean():
+    files = [Path("a.md"), Path("b.md")]
+    chunks = [_chunk("a.md"), _chunk("b.md"), _chunk("b.md", 1)]
+    assert idx.validate_corpus_coverage(files, chunks) == []
+
+
+def test_validate_corpus_coverage_flags_zero_chunk_file():
+    files = [Path("a.md"), Path("dropped.md")]
+    chunks = [_chunk("a.md")]
+    errors = idx.validate_corpus_coverage(files, chunks)
+    assert len(errors) == 1
+    assert "dropped.md" in errors[0]
+    assert "0 chunks" in errors[0]
+
+
+def test_validate_corpus_coverage_flags_foreign_source_file():
+    files = [Path("a.md")]
+    chunks = [_chunk("a.md"), _chunk("ghost.md")]
+    errors = idx.validate_corpus_coverage(files, chunks)
+    assert any("ghost.md" in e and "outside the corpus set" in e for e in errors)
+
+
+def test_validate_corpus_coverage_flags_empty_text():
+    files = [Path("a.md")]
+    chunks = [_chunk("a.md", 0, text="   ")]
+    errors = idx.validate_corpus_coverage(files, chunks)
+    assert any("a.md#0" in e and "empty" in e for e in errors)
+
+
+def test_validate_corpus_coverage_passes_on_authoritative_corpus():
+    # The real docs/reference/foia corpus must always clear the gate.
+    repo_root = Path(__file__).resolve().parents[3]
+    corpus = repo_root / "docs" / "reference" / "foia"
+    md_files = sorted(
+        p for p in corpus.glob("*.md") if p.name not in idx.SKIP_FILES
+    )
+    assert md_files, f"no corpus files at {corpus}"
+    chunks = []
+    for p in md_files:
+        chunks.extend(idx.chunk_file(p))
+    assert idx.validate_corpus_coverage(md_files, chunks) == []

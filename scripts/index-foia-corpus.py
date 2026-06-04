@@ -4,14 +4,15 @@ index-foia-corpus.py — FOIA markdown corpus indexer (parse + chunk stage).
 Reads FOIA authority markdown files, strips frontmatter, splits into
 citation-traceable chunks, and writes JSONL for later Atlas insertion.
 
-NOTE: retrieval-plan.md mentions docs/reference/foia/ as the corpus dir;
-that directory does not exist. The authoritative corpus seed is at
-data/seed/foia-precedent/ per domain-mapping.md. Use --corpus-dir to
-override when the expanded corpus path is created.
+Corpus: docs/reference/foia/ is the authoritative managed corpus
+(ADR-0003 + docs/retrieval-plan.md). The starter stubs at
+data/seed/foia-precedent/ are frozen instructor-demo scaffolding — use
+--corpus-dir to point at them only for demo purposes. Chunk-boundary
+rules are specified in docs/corpus-chunking-rules.md.
 
 Usage:
   python scripts/index-foia-corpus.py
-  python scripts/index-foia-corpus.py --corpus-dir docs/reference/foia
+  python scripts/index-foia-corpus.py --upsert --yes
   python scripts/index-foia-corpus.py --corpus-dir data/seed/foia-precedent \
       --out data/seed/foia-precedent-chunks.jsonl
 
@@ -431,9 +432,46 @@ def _upsert_to_mongo(chunks: list[dict], mongo_url: str, db_name: str,
     return coll.count_documents({})
 
 
+def validate_corpus_coverage(md_files: list[Path], chunks: list[dict]) -> list[str]:
+    """
+    Validate parsed chunks against the corpus file set (ingestion gate per
+    docs/implementation-task-breakdown.md "Corpus ingestion and metadata").
+
+    Returns a list of human-readable errors; empty list means the corpus
+    parsed cleanly. Checks: every corpus file produced at least one chunk
+    (a zero-chunk file is a silent drop from retrieval), every chunk
+    references a file in the corpus set, and no chunk has empty text.
+    """
+    errors: list[str] = []
+    counts: dict[str, int] = {}
+    for chunk in chunks:
+        counts[chunk["source_file"]] = counts.get(chunk["source_file"], 0) + 1
+
+    for path in md_files:
+        if counts.get(path.name, 0) == 0:
+            errors.append(
+                f"{path.name}: produced 0 chunks — file would silently "
+                f"vanish from retrieval (parse failure or empty body)"
+            )
+
+    known = {p.name for p in md_files}
+    for name in sorted(set(counts) - known):
+        errors.append(f"{name}: chunk references a file outside the corpus set")
+
+    for chunk in chunks:
+        if not chunk.get("text", "").strip():
+            errors.append(
+                f"{chunk['source_file']}#{chunk['chunk_index']}: empty chunk text"
+            )
+
+    return errors
+
+
 def main() -> None:
     repo_root = Path(__file__).resolve().parent.parent
-    default_corpus = repo_root / "data" / "seed" / "foia-precedent"
+    # Authoritative corpus home per ADR-0003; the data/seed stubs are frozen
+    # demo scaffolding reachable via --corpus-dir.
+    default_corpus = repo_root / "docs" / "reference" / "foia"
     default_out = repo_root / "data" / "seed" / "foia-precedent-chunks.jsonl"
 
     parser = argparse.ArgumentParser(
@@ -507,6 +545,19 @@ def main() -> None:
         file_chunks = chunk_file(path)
         all_chunks.extend(file_chunks)
         print(f"  {path.name}: {len(file_chunks)} chunk(s)")
+
+    # Ingestion gate — refuse to write anything (JSONL or Mongo) from a
+    # corpus run that dropped files or produced empty chunks.
+    validation_errors = validate_corpus_coverage(md_files, all_chunks)
+    if validation_errors:
+        for err in validation_errors:
+            print(f"VALIDATION: {err}", file=sys.stderr)
+        print(
+            f"ERROR: corpus validation failed ({len(validation_errors)} "
+            f"error(s)); nothing written.",
+            file=sys.stderr,
+        )
+        sys.exit(1)
 
     out_path.parent.mkdir(parents=True, exist_ok=True)
     with out_path.open("w", encoding="utf-8") as fh:
