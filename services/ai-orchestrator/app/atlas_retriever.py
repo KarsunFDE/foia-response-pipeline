@@ -93,11 +93,13 @@ def _get_collection():
         raise RetrievalUnavailableError(f"MongoDB connection failed: {exc}") from exc
 
 
-def clause_search(query: str, top_k: int = 5) -> list[dict[str, Any]]:
+def clause_search(query: str, top_k: int = 5, far_part: str | None = None) -> list[dict[str, Any]]:
     """
     Search the FOIA precedent corpus; return hit records shaped for /rag/clause-search.
 
     Each hit: {clause_id, title, score, far_part, cite, source_file, text}
+
+    When far_part is provided, hits are restricted to that far_part cite prefix (exact match).
 
     Resolution order:
       1. Atlas hybrid search — ONLY when ATLAS_HYBRID_ENABLED is set (the
@@ -110,15 +112,16 @@ def clause_search(query: str, top_k: int = 5) -> list[dict[str, Any]]:
     raises RetrievalUnavailableError instead.
     """
     if ATLAS_HYBRID_ENABLED and _LANGCHAIN_MONGODB_AVAILABLE:
-        hits = _atlas_hybrid_search(query, top_k)
+        hits = _atlas_hybrid_search(query, top_k, far_part=far_part)
     else:
-        hits = _pymongo_text_search(query, top_k)
+        hits = _pymongo_text_search(query, top_k, far_part=far_part)
     return [hit for hit in hits if hit["score"] >= MIN_SCORE]
 
 
-def _atlas_hybrid_search(query: str, top_k: int) -> list[dict[str, Any]]:
+def _atlas_hybrid_search(query: str, top_k: int, far_part: str | None = None) -> list[dict[str, Any]]:
     """
     TODO: implement after langchain-mongodb is installed and Atlas vector index exists.
+    far_part must become an exact-match pre-filter stage in the Atlas pipeline.
 
     Wire order:
       embeddings = BedrockEmbeddings(
@@ -141,7 +144,7 @@ def _atlas_hybrid_search(query: str, top_k: int) -> list[dict[str, Any]]:
     return []
 
 
-def _pymongo_text_search(query: str, top_k: int) -> list[dict[str, Any]]:
+def _pymongo_text_search(query: str, top_k: int, far_part: str | None = None) -> list[dict[str, Any]]:
     """
     Lexical fallback via pymongo $text operator.
 
@@ -152,10 +155,13 @@ def _pymongo_text_search(query: str, top_k: int) -> list[dict[str, Any]]:
     propagate unwrapped.
     """
     coll = _get_collection()
+    filter = {"$text": {"$search": query}}
+    if far_part:
+        filter["far_part"] = far_part
     try:
         cursor = (
             coll.find(
-                {"$text": {"$search": query}},
+                filter,
                 {
                     "score": {"$meta": "textScore"},
                     "clause_id": 1,

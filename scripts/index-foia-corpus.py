@@ -39,6 +39,7 @@ import os
 import re
 import sys
 from pathlib import Path
+from urllib.parse import urlparse
 
 # Split a section into sub-chunks only if it exceeds this many characters.
 # Keeps each chunk grounded to a precise regulatory passage.
@@ -297,28 +298,42 @@ def chunk_file(path: Path) -> list[dict]:
 # Entry point
 # ---------------------------------------------------------------------------
 
-def _upsert_to_mongo(chunks: list[dict], mongo_url: str, db_name: str) -> int:
+def _upsert_to_mongo(chunks: list[dict], mongo_url: str, db_name: str,
+                     collection_name: str = "foia_precedent", *,
+                     replace: bool = False) -> int:
     """
-    Drop and reload the foia_precedent collection, then create a text index.
+    Load chunks into the target collection, then create a text index.
 
-    Uses replace_one with upsert=True keyed on (source_file, chunk_index) so
-    re-runs are idempotent without requiring a full drop in production.
-    Returns the count of documents in the collection after upsert.
+    Delete-then-insert, scoped to the source files present in this run:
+    stale chunks (a file that shrank from 5 chunks to 3, or whose content
+    moved) are removed before the fresh chunks are inserted, so re-runs are
+    idempotent for re-indexed files. Chunks from source files that were
+    deleted or renamed since the last run are only removed by replace=True,
+    which clears the entire collection first.
+
+    Every document is stamped with a shared run_id (uuid4 hex) and an
+    indexed_at UTC timestamp so a corpus run can be identified and audited.
+    Returns the count of documents in the collection after the load.
     """
+    import uuid
+    from datetime import datetime, timezone
+
     import pymongo
 
-    client = pymongo.MongoClient(mongo_url, serverSelectionTimeoutMS=3000)
-    coll = client[db_name]["foia_precedent"]
+    run_id = uuid.uuid4().hex
+    indexed_at = datetime.now(timezone.utc).isoformat()
+    stamped = [{**c, "run_id": run_id, "indexed_at": indexed_at} for c in chunks]
 
-    ops = [
-        pymongo.ReplaceOne(
-            {"source_file": c["source_file"], "chunk_index": c["chunk_index"]},
-            c,
-            upsert=True,
-        )
-        for c in chunks
-    ]
-    coll.bulk_write(ops, ordered=False)
+    client = pymongo.MongoClient(mongo_url, serverSelectionTimeoutMS=3000)
+    coll = client[db_name][collection_name]
+
+    if replace:
+        coll.delete_many({})
+    else:
+        source_files = sorted({c["source_file"] for c in stamped})
+        coll.delete_many({"source_file": {"$in": source_files}})
+
+    coll.bulk_write([pymongo.InsertOne(c) for c in stamped], ordered=False)
     coll.create_index([("text", pymongo.TEXT)], name="foia_text_search")
     return coll.count_documents({})
 
@@ -346,7 +361,37 @@ def main() -> None:
     parser.add_argument(
         "--upsert",
         action="store_true",
-        help="Load chunks into MongoDB foia_precedent and create text index.",
+        help="Load chunks into MongoDB and create text index. Requires --yes.",
+    )
+    parser.add_argument(
+        "--replace",
+        action="store_true",
+        help="With --upsert: clear the ENTIRE target collection before "
+             "loading (removes chunks from deleted/renamed source files). "
+             "Requires --yes.",
+    )
+    parser.add_argument(
+        "--db",
+        default=os.environ.get("MONGO_DB", "foia_response_pipeline"),
+        help="Target MongoDB database (default: $MONGO_DB or foia_response_pipeline).",
+    )
+    parser.add_argument(
+        "--collection",
+        default="foia_precedent",
+        help="Target MongoDB collection (default: foia_precedent).",
+    )
+    parser.add_argument(
+        "--yes",
+        action="store_true",
+        help="Confirm the MongoDB write. Without it, --upsert prints the "
+             "target summary and exits without writing.",
+    )
+    parser.add_argument(
+        "--allow-remote",
+        action="store_true",
+        help="Permit writing to a non-localhost MongoDB host. Refused "
+             "otherwise so a stray MONGO_URL cannot hit a shared/production "
+             "instance.",
     )
     args = parser.parse_args()
 
@@ -377,13 +422,47 @@ def main() -> None:
 
     print(f"\n{len(all_chunks)} chunks from {len(md_files)} files -> {out_path}")
 
+    if args.replace and not args.upsert:
+        print("ERROR: --replace only makes sense with --upsert", file=sys.stderr)
+        sys.exit(2)
+
     if args.upsert:
         mongo_url = os.environ.get("MONGO_URL", "mongodb://app:app_dev_password@localhost:27017")
-        db_name = os.environ.get("MONGO_DB", "foia_response_pipeline")
-        print(f"Upserting into {db_name}.foia_precedent ...")
+        host = urlparse(mongo_url).hostname or "?"
+
+        # Show exactly what would be written where BEFORE touching the DB —
+        # the URL may carry credentials, so only the hostname is echoed.
+        source_files = sorted({c["source_file"] for c in all_chunks})
+        print(
+            f"\nMongoDB write target:\n"
+            f"  host:        {host}\n"
+            f"  database:    {args.db}\n"
+            f"  collection:  {args.collection}\n"
+            f"  chunks:      {len(all_chunks)} from {len(source_files)} source file(s)\n"
+            f"  mode:        {'REPLACE (clear entire collection first)' if args.replace else 'reindex listed source files only'}"
+        )
+
+        if host not in ("localhost", "127.0.0.1", "::1") and not args.allow_remote:
+            print(
+                f"ERROR: refusing to write to non-local MongoDB host {host!r} "
+                f"without --allow-remote",
+                file=sys.stderr,
+            )
+            sys.exit(2)
+
+        if not args.yes:
+            print(
+                "Dry run — no write performed. Re-run with --yes to confirm.",
+                file=sys.stderr,
+            )
+            sys.exit(0)
+
         try:
-            count = _upsert_to_mongo(all_chunks, mongo_url, db_name)
-            print(f"{count} documents in foia_precedent, text index created.")
+            count = _upsert_to_mongo(
+                all_chunks, mongo_url, args.db, args.collection,
+                replace=args.replace,
+            )
+            print(f"{count} documents in {args.db}.{args.collection}, text index created.")
         except Exception as exc:
             print(f"ERROR: upsert failed: {exc}", file=sys.stderr)
             sys.exit(1)

@@ -39,7 +39,8 @@ def test_clause_search_drops_hits_below_min_score(monkeypatch):
     monkeypatch.setattr(atlas_retriever, "MIN_SCORE", 1.0)
     monkeypatch.setattr(
         atlas_retriever, "_pymongo_text_search",
-        lambda query, top_k: [_hit(score=2.0), _hit(clause_id="weak", score=0.1)],
+        lambda query, top_k, far_part=None: [
+            _hit(score=2.0), _hit(clause_id="weak", score=0.1)],
     )
     hits = atlas_retriever.clause_search("exemption", top_k=5)
     assert [h["clause_id"] for h in hits] == ["5usc552-b-exemptions"]
@@ -52,9 +53,9 @@ def test_import_availability_alone_does_not_route_to_hybrid_stub(monkeypatch):
     monkeypatch.setattr(atlas_retriever, "_LANGCHAIN_MONGODB_AVAILABLE", True)
     monkeypatch.setattr(atlas_retriever, "ATLAS_HYBRID_ENABLED", False)
     monkeypatch.setattr(atlas_retriever, "_pymongo_text_search",
-                        lambda query, top_k: [_hit()])
+                        lambda query, top_k, far_part=None: [_hit()])
 
-    def _must_not_be_reached(query, top_k):
+    def _must_not_be_reached(query, top_k, far_part=None):
         raise AssertionError(
             "hybrid stub reached without ATLAS_HYBRID_ENABLED")
 
@@ -68,7 +69,8 @@ def test_hybrid_path_used_only_when_explicitly_enabled(monkeypatch):
     monkeypatch.setattr(atlas_retriever, "_LANGCHAIN_MONGODB_AVAILABLE", True)
     monkeypatch.setattr(atlas_retriever, "ATLAS_HYBRID_ENABLED", True)
     monkeypatch.setattr(atlas_retriever, "_atlas_hybrid_search",
-                        lambda query, top_k: [_hit(clause_id="hybrid")])
+                        lambda query, top_k, far_part=None: [
+                            _hit(clause_id="hybrid")])
     hits = atlas_retriever.clause_search("exemption")
     assert hits[0]["clause_id"] == "hybrid"
 
@@ -86,7 +88,7 @@ def test_infra_failure_raises_retrieval_unavailable(monkeypatch):
 
 
 def test_endpoint_returns_503_on_retrieval_failure(monkeypatch):
-    def _broken(query, top_k=5):
+    def _broken(query, top_k=5, far_part=None):
         raise atlas_retriever.RetrievalUnavailableError(
             "MongoDB connection failed")
 
@@ -102,7 +104,7 @@ def test_endpoint_returns_503_on_retrieval_failure(monkeypatch):
 
 def test_endpoint_escalates_below_confidence_bar(monkeypatch):
     monkeypatch.setattr(atlas_retriever, "clause_search",
-                        lambda query, top_k=5: [])
+                        lambda query, top_k=5, far_part=None: [])
     invoked = []
     monkeypatch.setattr(app_main, "invoke_model",
                         lambda *a, **k: invoked.append(a) or {"body": "x"})
@@ -117,7 +119,7 @@ def test_endpoint_escalates_below_confidence_bar(monkeypatch):
 def test_endpoint_synthesis_grounded_in_retrieved_excerpts(monkeypatch):
     hit = _hit(text="Records compiled for law enforcement purposes.")
     monkeypatch.setattr(atlas_retriever, "clause_search",
-                        lambda query, top_k=5: [hit])
+                        lambda query, top_k=5, far_part=None: [hit])
     prompts = []
 
     def _fake_invoke(prompt, **kwargs):
@@ -135,3 +137,69 @@ def test_endpoint_synthesis_grounded_in_retrieved_excerpts(monkeypatch):
     assert hit["text"] in prompts[0]
     assert hit["clause_id"] in prompts[0]
     assert hit["cite"] in prompts[0]
+
+
+def test_clause_search_forwards_far_part_to_pymongo(monkeypatch):
+    # far_part is an exact-match pre-filter; clause_search must thread it
+    # through to the lexical search rather than dropping it.
+    monkeypatch.setattr(atlas_retriever, "ATLAS_HYBRID_ENABLED", False)
+    captured = {}
+
+    def _fake_search(query, top_k, far_part=None):
+        captured["query"] = query
+        captured["top_k"] = top_k
+        captured["far_part"] = far_part
+        return [_hit()]
+
+    monkeypatch.setattr(atlas_retriever, "_pymongo_text_search", _fake_search)
+    atlas_retriever.clause_search("x", far_part="5 USC 552")
+    assert captured["far_part"] == "5 USC 552"
+
+
+def test_endpoint_forwards_far_part_to_clause_search(monkeypatch):
+    # POST body far_part must reach clause_search as a kwarg.
+    captured = {}
+
+    def _fake_clause_search(query, top_k=5, far_part=None):
+        captured["query"] = query
+        captured["top_k"] = top_k
+        captured["far_part"] = far_part
+        return [_hit()]
+
+    monkeypatch.setattr(atlas_retriever, "clause_search", _fake_clause_search)
+    monkeypatch.setattr(app_main, "invoke_model",
+                        lambda *a, **k: {"body": "stub synthesis"})
+    resp = client.post("/rag/clause-search",
+                       json={"query": "exemption", "far_part": "5 USC 552"})
+    assert resp.status_code == 200
+    assert captured["far_part"] == "5 USC 552"
+
+
+def test_endpoint_success_response_shape(monkeypatch):
+    monkeypatch.setattr(atlas_retriever, "clause_search",
+                        lambda query, top_k=5, far_part=None: [_hit()])
+    monkeypatch.setattr(app_main, "invoke_model",
+                        lambda *a, **k: {"body": "[5usc552-b-exemptions] summary"})
+    resp = client.post("/rag/clause-search", json={"query": "exemption"})
+    assert resp.status_code == 200
+    body = resp.json()
+    assert set(body.keys()) == {
+        "query", "hits", "synthesis", "needs_review", "model"}
+    assert body["needs_review"] is False
+    assert body["synthesis"] is not None
+
+
+def test_endpoint_escalation_response_shape(monkeypatch):
+    # Sub-confidence-bar path carries the extra review_reason key and never
+    # synthesizes.
+    monkeypatch.setattr(atlas_retriever, "clause_search",
+                        lambda query, top_k=5, far_part=None: [])
+    monkeypatch.setattr(app_main, "invoke_model",
+                        lambda *a, **k: {"body": "should not be called"})
+    resp = client.post("/rag/clause-search", json={"query": "exemption"})
+    assert resp.status_code == 200
+    body = resp.json()
+    assert set(body.keys()) == {
+        "query", "hits", "synthesis", "needs_review", "review_reason", "model"}
+    assert body["needs_review"] is True
+    assert body["synthesis"] is None

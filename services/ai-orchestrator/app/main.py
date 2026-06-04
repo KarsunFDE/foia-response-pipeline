@@ -252,7 +252,7 @@ def rag_clause_search(req: ClauseSearchRequest) -> dict[str, Any]:
     log.info("rag/clause-search query=%r far_part=%r top_k=%d",
              req.query[:60], req.far_part, req.top_k)
     try:
-        hits = atlas_retriever.clause_search(req.query, top_k=req.top_k)
+        hits = atlas_retriever.clause_search(req.query, top_k=req.top_k, far_part=req.far_part)
     except atlas_retriever.RetrievalUnavailableError as exc:
         # Infrastructure failure is NOT "no responsive precedent" — surface a
         # degraded state, and never emit synthesis off broken retrieval.
