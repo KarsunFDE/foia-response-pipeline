@@ -45,8 +45,16 @@ from urllib.parse import urlparse
 # Keeps each chunk grounded to a precise regulatory passage.
 MAX_SECTION_CHARS = 800
 
+# Overlap between forced sub-splits of a single over-limit paragraph, so a
+# clause cut mid-thought stays retrievable from both sides.
+CHUNK_OVERLAP_CHARS = 100
+
 # Files to skip in the corpus directory.
 SKIP_FILES = {"README.md"}
+
+# Matches only the generator's provenance footer; legitimate trailing
+# blockquotes (quoted statutory text) must survive.
+STUB_FOOTER_RE = re.compile(r"^>\s*STARTER STUB\b")
 
 
 # ---------------------------------------------------------------------------
@@ -102,13 +110,20 @@ def extract_h1(body: str) -> tuple[str | None, str]:
 
 def strip_stub_footer(text: str) -> str:
     """
-    Remove trailing blockquote lines (the '> STARTER STUB...' footer).
+    Remove only the '> STARTER STUB ...' provenance footer.
 
-    Strips from the last contiguous run of '>' lines at the end of text.
+    Pops trailing blank lines and lines matching STUB_FOOTER_RE from the
+    end of the text, stopping at the first non-blank line that does not
+    match. Preserves legitimate trailing blockquotes (quoted statutory
+    text), including ordinary '>' lines.
     """
     lines = text.splitlines()
-    while lines and lines[-1].strip().startswith(">"):
-        lines.pop()
+    while lines:
+        stripped = lines[-1].strip()
+        if stripped == "" or STUB_FOOTER_RE.match(stripped):
+            lines.pop()
+        else:
+            break
     return "\n".join(lines).rstrip()
 
 
@@ -184,12 +199,62 @@ def split_into_sections(body: str) -> list[tuple[str, str]]:
 # Paragraph-level sub-chunking
 # ---------------------------------------------------------------------------
 
+def _hard_split(text: str, max_chars: int, overlap: int = CHUNK_OVERLAP_CHARS) -> list[str]:
+    """
+    Force-split a single over-limit paragraph into chunks within max_chars.
+
+    First tries sentence boundaries: sentences are greedily packed into
+    chunks no larger than max_chars. Any single sentence that still exceeds
+    max_chars falls back to a fixed character window — slices of max_chars
+    stepping by (max_chars - overlap), so adjacent slices share `overlap`
+    characters and a clause cut mid-sentence stays retrievable from both
+    sides. Never returns an empty list; no returned chunk exceeds max_chars.
+    """
+    sentences = [s.strip() for s in re.split(r"(?<=[.;:])\s+", text) if s.strip()]
+    chunks: list[str] = []
+    current_parts: list[str] = []
+    current_len = 0
+
+    def flush() -> None:
+        nonlocal current_parts, current_len
+        if current_parts:
+            chunks.append(" ".join(current_parts))
+            current_parts = []
+            current_len = 0
+
+    for sentence in sentences:
+        if len(sentence) > max_chars:
+            # Sentence alone busts the budget: emit any pending pack, then
+            # slice this sentence with a sliding character window.
+            flush()
+            step = max(1, max_chars - overlap)
+            for start in range(0, len(sentence), step):
+                piece = sentence[start:start + max_chars].strip()
+                if piece:
+                    chunks.append(piece)
+            continue
+        # +1 for the space separator when joined.
+        if current_len + len(sentence) + 1 > max_chars and current_parts:
+            flush()
+            current_parts = [sentence]
+            current_len = len(sentence)
+        else:
+            current_parts.append(sentence)
+            current_len += len(sentence) + 1
+
+    flush()
+
+    return [c for c in (chunk.strip() for chunk in chunks) if c] or [text.strip()]
+
+
 def split_by_paragraphs(text: str, max_chars: int = MAX_SECTION_CHARS) -> list[str]:
     """
     Split text by blank-line paragraph boundaries when it exceeds max_chars.
 
     Returns the original text as a single-element list if it is short
-    enough. Never returns an empty list.
+    enough. Paragraphs that on their own exceed max_chars are hard-split at
+    sentence then character boundaries with CHUNK_OVERLAP_CHARS overlap, so
+    no returned chunk exceeds max_chars. Never returns an empty list.
     """
     if len(text) <= max_chars:
         return [text]
@@ -199,23 +264,35 @@ def split_by_paragraphs(text: str, max_chars: int = MAX_SECTION_CHARS) -> list[s
     current_parts: list[str] = []
     current_len = 0
 
+    def flush() -> None:
+        nonlocal current_parts, current_len
+        if current_parts:
+            chunks.append("\n\n".join(current_parts))
+            current_parts = []
+            current_len = 0
+
     for para in raw_paras:
         para = para.strip()
         if not para:
             continue
+        if len(para) > max_chars:
+            # A single paragraph over the budget cannot ride along in a pack;
+            # emit the pending pack, then hard-split this paragraph.
+            flush()
+            chunks.extend(_hard_split(para, max_chars))
+            continue
         # +2 for the \n\n separator when joined.
         if current_len + len(para) + 2 > max_chars and current_parts:
-            chunks.append("\n\n".join(current_parts))
+            flush()
             current_parts = [para]
             current_len = len(para)
         else:
             current_parts.append(para)
             current_len += len(para) + 2
 
-    if current_parts:
-        chunks.append("\n\n".join(current_parts))
+    flush()
 
-    return chunks or [text]
+    return chunks or _hard_split(text, max_chars)
 
 
 # ---------------------------------------------------------------------------
@@ -313,6 +390,9 @@ def _upsert_to_mongo(chunks: list[dict], mongo_url: str, db_name: str,
 
     Every document is stamped with a shared run_id (uuid4 hex) and an
     indexed_at UTC timestamp so a corpus run can be identified and audited.
+    On a partial bulk-write failure the run's documents are deleted (by
+    run_id) and the error re-raised — the collection is left without the
+    affected source files until a clean re-run.
     Returns the count of documents in the collection after the load.
     """
     import uuid
@@ -333,7 +413,20 @@ def _upsert_to_mongo(chunks: list[dict], mongo_url: str, db_name: str,
         source_files = sorted({c["source_file"] for c in stamped})
         coll.delete_many({"source_file": {"$in": source_files}})
 
-    coll.bulk_write([pymongo.InsertOne(c) for c in stamped], ordered=False)
+    try:
+        coll.bulk_write([pymongo.InsertOne(c) for c in stamped], ordered=False)
+    except pymongo.errors.BulkWriteError as exc:
+        # Partial inserts would leave a mixed old/new corpus (the run's old
+        # source_file docs are already deleted). Remove everything this run
+        # wrote, then surface the failure — a clean re-run re-indexes the
+        # affected files in full.
+        coll.delete_many({"run_id": run_id})
+        write_errors = exc.details.get("writeErrors", []) if exc.details else []
+        raise RuntimeError(
+            f"bulk insert failed ({len(write_errors)} write error(s)); "
+            f"cleaned up partial run {run_id}. First errors: {write_errors[:3]}"
+        ) from exc
+
     coll.create_index([("text", pymongo.TEXT)], name="foia_text_search")
     return coll.count_documents({})
 

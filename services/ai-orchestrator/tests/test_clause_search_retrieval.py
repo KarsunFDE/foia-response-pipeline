@@ -30,6 +30,8 @@ def _hit(clause_id: str = "5usc552-b-exemptions", score: float = 2.0,
         "far_part": "5 USC 552",
         "cite": "5 U.S.C. 552(b)",
         "source_file": "5usc552-b-exemptions.md",
+        "chunk_index": 0,
+        "heading_path": ["FOIA Exemptions"],
         "text": text,
     }
 
@@ -203,3 +205,27 @@ def test_endpoint_escalation_response_shape(monkeypatch):
         "query", "hits", "synthesis", "needs_review", "review_reason", "model"}
     assert body["needs_review"] is True
     assert body["synthesis"] is None
+
+
+def test_doc_to_hit_includes_traceability_fields():
+    hit = atlas_retriever._doc_to_hit({
+        "clause_id": "5usc552-b-exemptions",
+        "title": "FOIA Exemptions",
+        "score": 2.0,
+        "far_part": "5 USC 552",
+        "cite": "5 U.S.C. 552(b)",
+        "source_file": "5usc552-b-exemptions.md",
+        "chunk_index": 3,
+        "heading_path": ["T", "S"],
+        "text": "x",
+    })
+    assert hit["chunk_index"] == 3
+    assert hit["heading_path"] == ["T", "S"]
+    assert hit["cite"] == "5 U.S.C. 552(b)"
+    assert hit["source_file"] == "5usc552-b-exemptions.md"
+
+
+def test_doc_to_hit_bounds_snippet_text(monkeypatch):
+    monkeypatch.setattr(atlas_retriever, "SNIPPET_MAX_CHARS", 50)
+    hit = atlas_retriever._doc_to_hit({"text": "y" * 500})
+    assert len(hit["text"]) == 50

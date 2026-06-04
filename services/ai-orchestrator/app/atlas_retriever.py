@@ -42,6 +42,10 @@ COLLECTION_FOIA_PRECEDENT = "foia_precedent"
 MIN_SCORE = float(os.environ.get("CLAUSE_SEARCH_MIN_SCORE", "1.0"))
 MIN_HITS = int(os.environ.get("CLAUSE_SEARCH_MIN_HITS", "1"))
 
+# Bounds hit text in responses/prompts; chunks are budgeted ~800 chars by the
+# indexer, so this only truncates pathological docs.
+SNIPPET_MAX_CHARS = int(os.environ.get("CLAUSE_SEARCH_SNIPPET_MAX_CHARS", "1200"))
+
 # Atlas hybrid search must be EXPLICITLY enabled once wired (W2 TODO item 6
 # above). Routing on import availability alone would silently bypass the
 # working lexical path the moment langchain-mongodb lands in requirements.txt
@@ -97,7 +101,8 @@ def clause_search(query: str, top_k: int = 5, far_part: str | None = None) -> li
     """
     Search the FOIA precedent corpus; return hit records shaped for /rag/clause-search.
 
-    Each hit: {clause_id, title, score, far_part, cite, source_file, text}
+    Each hit: {clause_id, title, score, far_part, cite, source_file, chunk_index, heading_path, text}
+    (text bounded to SNIPPET_MAX_CHARS).
 
     When far_part is provided, hits are restricted to that far_part cite prefix (exact match).
 
@@ -169,6 +174,8 @@ def _pymongo_text_search(query: str, top_k: int, far_part: str | None = None) ->
                     "far_part": 1,
                     "cite": 1,
                     "source_file": 1,
+                    "chunk_index": 1,
+                    "heading_path": 1,
                     "text": 1,
                 },
             )
@@ -192,5 +199,7 @@ def _doc_to_hit(doc: dict[str, Any]) -> dict[str, Any]:
         # (docs/hitl-plan.md) need the source text + citation, not just ids.
         "cite": doc.get("cite"),
         "source_file": doc.get("source_file", ""),
-        "text": doc.get("text", ""),
+        "chunk_index": doc.get("chunk_index"),
+        "heading_path": doc.get("heading_path", []),
+        "text": (doc.get("text", "") or "")[:SNIPPET_MAX_CHARS],
     }

@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import importlib.util
 import sys
+import types
 from pathlib import Path
 
 import pytest
@@ -58,8 +59,9 @@ def test_strip_stub_footer_removes_trailing_blockquote():
 
 
 def test_strip_stub_footer_preserves_non_trailing_blockquote_and_body():
-    # A blockquote that is NOT the trailing run must survive, because the
-    # function only pops the contiguous '>' run at the very end.
+    # A blockquote that is NOT the footer must survive, because the function
+    # only pops trailing blank lines and lines matching the '> STARTER STUB ...'
+    # pattern, not arbitrary '>' blockquote lines.
     text = (
         "> A quoted passage in the middle of the document.\n\n"
         "Regular body text after the quote.\n\n"
@@ -69,6 +71,19 @@ def test_strip_stub_footer_preserves_non_trailing_blockquote_and_body():
     assert "STARTER STUB" not in out
     assert "> A quoted passage in the middle of the document." in out
     assert "Regular body text after the quote." in out
+
+
+def test_strip_stub_footer_preserves_trailing_legitimate_blockquote():
+    # A legitimate quoted statutory excerpt immediately before the stub footer
+    # must survive — only the '> STARTER STUB ...' line is provenance to drop.
+    text = (
+        "Body paragraph.\n\n"
+        '> "Records compiled for law enforcement purposes..." 5 USC 552(b)(7)\n\n'
+        "> STARTER STUB — paraphrased. See https://example.gov"
+    )
+    out = idx.strip_stub_footer(text)
+    assert "STARTER STUB" not in out
+    assert '> "Records compiled for law enforcement purposes..." 5 USC 552(b)(7)' in out
 
 
 # ---------------------------------------------------------------------------
@@ -92,13 +107,32 @@ def test_split_by_paragraphs_over_limit_splits_into_multiple_chunks():
     assert all(len(c) <= idx.MAX_SECTION_CHARS for c in chunks)
 
 
-def test_split_by_paragraphs_single_oversized_paragraph_not_split():
-    # A single paragraph with no blank-line boundary cannot be split; the
-    # implementation returns it as one chunk even though it exceeds the limit.
-    para = "y" * (idx.MAX_SECTION_CHARS + 200)
-    chunks = idx.split_by_paragraphs(para)
-    assert chunks == [para]
-    assert len(chunks[0]) > idx.MAX_SECTION_CHARS
+def test_split_by_paragraphs_single_oversized_paragraph_hard_split():
+    # A single paragraph with no blank-line boundary that exceeds max_chars is
+    # hard-split at sentence boundaries; no chunk exceeds the limit and every
+    # sentence's distinctive token survives in at least one chunk.
+    sentences = [f"Sentence number tokenword{i} expands the passage." for i in range(40)]
+    para = " ".join(sentences)
+    assert len(para) > 1800
+    chunks = idx.split_by_paragraphs(para, max_chars=300)
+    assert len(chunks) > 1
+    assert all(len(c) <= 300 for c in chunks)
+    joined = "\n".join(chunks)
+    for i in range(40):
+        assert f"tokenword{i}" in joined
+
+
+def test_hard_split_character_fallback_with_overlap():
+    # A single 1000-char "sentence" with no sentence punctuation cannot split
+    # at a sentence boundary, so it falls back to a sliding character window:
+    # all chunks within the limit and consecutive chunks share an overlap.
+    text = "x" * 1000
+    result = idx._hard_split(text, max_chars=300)
+    assert len(result) > 1
+    assert all(len(c) <= 300 for c in result)
+    # step = max_chars - overlap = 300 - 100 = 200, so the second chunk starts
+    # 200 chars in and shares the trailing 100 chars of the first.
+    assert result[0][-100:] in result[1]
 
 
 # ---------------------------------------------------------------------------
@@ -163,11 +197,19 @@ def test_chunk_file_frontmatter_only_no_body(tmp_path):
 # _upsert_to_mongo against an injected fake pymongo
 # ---------------------------------------------------------------------------
 
+class _FakeBulkWriteError(Exception):
+    def __init__(self, details):
+        super().__init__("fake bulk write error")
+        self.details = details
+
+
 class _FakeCollection:
     def __init__(self):
         self.delete_filters = []
         self.bulk_ops = []
         self.create_index_calls = []
+        # When set, bulk_write raises this after recording its ops.
+        self.bulk_write_error = None
 
     def delete_many(self, filt):
         self.delete_filters.append(filt)
@@ -175,6 +217,8 @@ class _FakeCollection:
     def bulk_write(self, ops, ordered=True):
         # Record that delete happened before this (caller asserts ordering).
         self.bulk_ops = ops
+        if self.bulk_write_error is not None:
+            raise self.bulk_write_error
 
     def create_index(self, keys, name=None):
         self.create_index_calls.append((keys, name))
@@ -217,6 +261,9 @@ def _install_fake_pymongo(monkeypatch):
     fake.MongoClient = lambda *a, **k: client
     fake.InsertOne = _InsertOne
     fake.TEXT = "text"
+    # Real pymongo exposes BulkWriteError under pymongo.errors; mirror that so
+    # the impl's `except pymongo.errors.BulkWriteError` resolves.
+    fake.errors = types.SimpleNamespace(BulkWriteError=_FakeBulkWriteError)
     monkeypatch.setitem(sys.modules, "pymongo", fake)
     return client, db, coll
 
@@ -271,3 +318,51 @@ def test_upsert_respects_collection_name(monkeypatch):
         _chunks(), "mongodb://localhost:27017", "testdb",
         collection_name="custom_coll")
     assert "custom_coll" in db.requested_names
+
+
+def test_upsert_partial_bulk_failure_cleans_up_run(monkeypatch):
+    _client, _db, coll = _install_fake_pymongo(monkeypatch)
+    coll.bulk_write_error = _FakeBulkWriteError(
+        details={"writeErrors": [{"index": 1, "errmsg": "dup"}]}
+    )
+    chunks = [
+        {"source_file": "a.md", "chunk_index": 0, "text": "alpha"},
+        {"source_file": "a.md", "chunk_index": 1, "text": "beta"},
+    ]
+
+    with pytest.raises(RuntimeError) as excinfo:
+        idx._upsert_to_mongo(chunks, "mongodb://localhost", "db")
+
+    # (a) message mentions cleanup and the write-error count.
+    msg = str(excinfo.value)
+    assert "cleaned up partial run" in msg
+    assert "1 write error(s)" in msg
+
+    # (b) a run_id-scoped delete_many ran AFTER the bulk_write attempt.
+    assert coll.bulk_ops, "bulk_write should have been attempted"
+    run_id = coll.bulk_ops[0].doc["run_id"]
+    assert coll.delete_filters[-1] == {"run_id": run_id}
+    assert len(run_id) == 32
+    int(run_id, 16)  # valid hex
+
+    # (c) the text index was never created after a failed load.
+    assert coll.create_index_calls == []
+
+    # (d) exception chaining preserved.
+    assert excinfo.value.__cause__ is coll.bulk_write_error
+
+
+# ---------------------------------------------------------------------------
+# Real-corpus budget enforcement
+# ---------------------------------------------------------------------------
+
+def test_split_by_paragraphs_no_chunk_exceeds_budget_on_real_corpus():
+    # The b-exemptions file historically carried a single 1236-char paragraph
+    # that passed through whole; every chunk must now stay within the budget.
+    repo_root = Path(__file__).resolve().parents[3]
+    path = repo_root / "data" / "seed" / "foia-precedent" / "5usc552-b-exemptions.md"
+    assert path.exists(), f"corpus file not found at {path}"
+    chunks = idx.chunk_file(path)
+    assert chunks, "expected at least one chunk"
+    for c in chunks:
+        assert len(c["text"]) <= idx.MAX_SECTION_CHARS
