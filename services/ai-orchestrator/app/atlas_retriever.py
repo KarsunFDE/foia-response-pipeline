@@ -14,6 +14,8 @@ TODO (W2 RAG work — must complete before Atlas hybrid search works):
        }}}
   4. Run the FOIA corpus indexer (scripts/index-foia-corpus.py — see proposal below).
   5. Replace _atlas_hybrid_search() stub body with real MongoDBAtlasVectorSearch wiring.
+  6. Set ATLAS_HYBRID_ENABLED=true (env) once the hybrid path is wired AND tested —
+     import availability alone never routes to it (see clause_search).
 
 Missing that blocks Atlas hybrid search:
   - langchain-mongodb (not in requirements.txt)
@@ -32,6 +34,27 @@ log = logging.getLogger("ai-orchestrator.atlas_retriever")
 MONGO_URL = os.environ.get("MONGO_URL", "mongodb://app:app_dev_password@localhost:27017")
 MONGO_DB = os.environ.get("MONGO_DB", "foia_response_pipeline")
 COLLECTION_FOIA_PRECEDENT = "foia_precedent"
+
+# Confidence bar for retrieval (FOIA-conservative: weak hits are not usable
+# precedent — docs/retrieval-plan.md escalation rule + REQ-RAG-2 in
+# docs/prd/phase-1-ai-adoption.md). Defaults are provisional pending the W2
+# retrieval-eval pass; tune via env without a code change.
+MIN_SCORE = float(os.environ.get("CLAUSE_SEARCH_MIN_SCORE", "1.0"))
+MIN_HITS = int(os.environ.get("CLAUSE_SEARCH_MIN_HITS", "1"))
+
+# Atlas hybrid search must be EXPLICITLY enabled once wired (W2 TODO item 6
+# above). Routing on import availability alone would silently bypass the
+# working lexical path the moment langchain-mongodb lands in requirements.txt
+# — _atlas_hybrid_search is still a stub returning [].
+ATLAS_HYBRID_ENABLED = os.environ.get("ATLAS_HYBRID_ENABLED", "").lower() in ("1", "true", "yes")
+
+
+class RetrievalUnavailableError(RuntimeError):
+    """
+    Retrieval infrastructure failure — Mongo unreachable, missing text index,
+    auth failure. Distinct from a search that ran and matched nothing: callers
+    must surface this as a degraded state, never as an empty-but-OK result.
+    """
 
 # TODO: once langchain-mongodb is in requirements.txt, replace this block with:
 #   from langchain_mongodb import MongoDBAtlasVectorSearch
@@ -58,30 +81,39 @@ _mongo_client = None
 def _get_collection():
     global _mongo_client
     if not _PYMONGO_AVAILABLE:
-        return None
+        raise RetrievalUnavailableError(
+            "pymongo not installed — lexical retrieval unavailable"
+        )
     try:
         if _mongo_client is None:
             _mongo_client = pymongo.MongoClient(MONGO_URL, serverSelectionTimeoutMS=1000)
         return _mongo_client[MONGO_DB][COLLECTION_FOIA_PRECEDENT]
-    except Exception as exc:
+    except pymongo.errors.PyMongoError as exc:
         log.warning("MongoDB connection failed: %s", exc)
-        return None
+        raise RetrievalUnavailableError(f"MongoDB connection failed: {exc}") from exc
 
 
 def clause_search(query: str, top_k: int = 5) -> list[dict[str, Any]]:
     """
     Search the FOIA precedent corpus; return hit records shaped for /rag/clause-search.
 
-    Each hit: {clause_id: str, title: str, score: float, far_part: str}
+    Each hit: {clause_id, title, score, far_part, cite, source_file, text}
 
     Resolution order:
-      1. Atlas hybrid search (langchain-mongodb + vector index) — not yet available.
-      2. pymongo $text lexical search — available once corpus is indexed with a text index.
-      3. Empty list — if MongoDB is unreachable or collection has no text index.
+      1. Atlas hybrid search — ONLY when ATLAS_HYBRID_ENABLED is set (the
+         hybrid path is still a stub; import availability alone never routes
+         to it).
+      2. pymongo $text lexical search.
+
+    Hits scoring below MIN_SCORE are dropped (confidence bar). An empty list
+    means the search ran and found nothing usable; infrastructure failure
+    raises RetrievalUnavailableError instead.
     """
-    if _LANGCHAIN_MONGODB_AVAILABLE:
-        return _atlas_hybrid_search(query, top_k)
-    return _pymongo_text_search(query, top_k)
+    if ATLAS_HYBRID_ENABLED and _LANGCHAIN_MONGODB_AVAILABLE:
+        hits = _atlas_hybrid_search(query, top_k)
+    else:
+        hits = _pymongo_text_search(query, top_k)
+    return [hit for hit in hits if hit["score"] >= MIN_SCORE]
 
 
 def _atlas_hybrid_search(query: str, top_k: int) -> list[dict[str, Any]]:
@@ -114,24 +146,33 @@ def _pymongo_text_search(query: str, top_k: int) -> list[dict[str, Any]]:
     Lexical fallback via pymongo $text operator.
 
     Requires a text index on foia_precedent — the corpus indexer must have run.
-    Returns [] silently if the collection is missing or has no text index.
+    Raises RetrievalUnavailableError on infrastructure failure (Mongo
+    unreachable, missing text index, auth failure) so callers can distinguish
+    "retrieval is broken" from "search ran, no matches". Programming errors
+    propagate unwrapped.
     """
     coll = _get_collection()
-    if coll is None:
-        return []
     try:
         cursor = (
             coll.find(
                 {"$text": {"$search": query}},
-                {"score": {"$meta": "textScore"}, "clause_id": 1, "title": 1, "far_part": 1},
+                {
+                    "score": {"$meta": "textScore"},
+                    "clause_id": 1,
+                    "title": 1,
+                    "far_part": 1,
+                    "cite": 1,
+                    "source_file": 1,
+                    "text": 1,
+                },
             )
             .sort([("score", {"$meta": "textScore"})])
             .limit(top_k)
         )
         return [_doc_to_hit(doc) for doc in cursor]
-    except Exception as exc:
-        log.warning("pymongo text search failed (%s); returning no hits", exc)
-        return []
+    except pymongo.errors.PyMongoError as exc:
+        log.warning("pymongo text search failed: %s", exc)
+        raise RetrievalUnavailableError(f"lexical text search failed: {exc}") from exc
 
 
 def _doc_to_hit(doc: dict[str, Any]) -> dict[str, Any]:
@@ -141,4 +182,9 @@ def _doc_to_hit(doc: dict[str, Any]) -> dict[str, Any]:
         "title": doc.get("title", ""),
         "score": float(doc.get("score", 0.0)),
         "far_part": doc.get("far_part", ""),
+        # Grounding metadata — the synthesis prompt and reviewer traceability
+        # (docs/hitl-plan.md) need the source text + citation, not just ids.
+        "cite": doc.get("cite"),
+        "source_file": doc.get("source_file", ""),
+        "text": doc.get("text", ""),
     }

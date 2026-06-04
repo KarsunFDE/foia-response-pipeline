@@ -251,15 +251,57 @@ def rag_clause_search(req: ClauseSearchRequest) -> dict[str, Any]:
     """
     log.info("rag/clause-search query=%r far_part=%r top_k=%d",
              req.query[:60], req.far_part, req.top_k)
-    hits = atlas_retriever.clause_search(req.query, top_k=req.top_k)
+    try:
+        hits = atlas_retriever.clause_search(req.query, top_k=req.top_k)
+    except atlas_retriever.RetrievalUnavailableError as exc:
+        # Infrastructure failure is NOT "no responsive precedent" — surface a
+        # degraded state, and never emit synthesis off broken retrieval.
+        raise HTTPException(
+            status_code=503,
+            detail=f"clause retrieval unavailable: {exc}",
+        ) from exc
+
+    if len(hits) < atlas_retriever.MIN_HITS:
+        # Below the confidence bar — withhold and escalate (REQ-RAG-2,
+        # docs/hitl-plan.md): no grounded sources means no synthesis.
+        return {
+            "query": req.query,
+            "hits": hits,
+            "synthesis": None,
+            "needs_review": True,
+            "review_reason": (
+                "no hits at or above the retrieval confidence bar; "
+                "escalate to a human reviewer"
+            ),
+            "model": BEDROCK_MODEL_ID,
+        }
+
+    # Ground the synthesis in the retrieved excerpts ONLY — uncited model
+    # output must never sit beside citation-bearing hits as if it were
+    # authority (5 USC 552(b) / OIP foreseeable-harm conservatism).
+    excerpts = "\n\n".join(
+        f"[{hit['clause_id']}] {hit.get('cite') or hit['far_part']} — "
+        f"{hit['title']} ({hit['source_file']})\n{hit['text']}"
+        for hit in hits
+    )
     bedrock = invoke_model(
-        f"Summarize FOIA statute / regulation relevant to: {req.query}",
-        system="You retrieve 5 USC 552 / 28 CFR 16 provisions; cite section IDs.",
+        "Using ONLY the FOIA source excerpts below, summarize the statute / "
+        f"regulation relevant to: {req.query}\n\n"
+        f"Source excerpts:\n{excerpts}\n\n"
+        "Cite the bracketed clause_id for every statement. If the excerpts "
+        "do not address the query, say exactly that — do not draw on outside "
+        "knowledge.",
+        system=(
+            "You summarize 5 USC 552 / 28 CFR 16 provisions strictly from "
+            "the supplied excerpts; every claim must carry a bracketed "
+            "clause_id citation."
+        ),
     )
     return {
         "query": req.query,
         "hits": hits,
         "synthesis": bedrock["body"],
+        "needs_review": False,
         "model": BEDROCK_MODEL_ID,
     }
 
