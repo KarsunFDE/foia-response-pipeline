@@ -59,6 +59,7 @@ except ImportError:
 from app import legacy_chain  # noqa: F401 — imported to keep the v0.x entry
                                 # point reachable; cohort grep finds the seam.
 from app.bedrock_client import invoke_model, BEDROCK_MODEL_ID, AWS_REGION
+from app import atlas_retriever
 
 # ⚠ DELIBERATE — no correlation-ID in the log format (Item 6).
 logging.basicConfig(
@@ -250,22 +251,57 @@ def rag_clause_search(req: ClauseSearchRequest) -> dict[str, Any]:
     """
     log.info("rag/clause-search query=%r far_part=%r top_k=%d",
              req.query[:60], req.far_part, req.top_k)
-    # ⚠ Atlas Vector Search call would land here; stub returns a shaped
-    # response so the surface flows.
-    bedrock = invoke_model(
-        f"Summarize FOIA statute / regulation relevant to: {req.query}",
-        system="You retrieve 5 USC 552 / 28 CFR 16 provisions; cite section IDs.",
+    try:
+        hits = atlas_retriever.clause_search(req.query, top_k=req.top_k, far_part=req.far_part)
+    except atlas_retriever.RetrievalUnavailableError as exc:
+        # Infrastructure failure is NOT "no responsive precedent" — surface a
+        # degraded state, and never emit synthesis off broken retrieval.
+        raise HTTPException(
+            status_code=503,
+            detail=f"clause retrieval unavailable: {exc}",
+        ) from exc
+
+    if len(hits) < atlas_retriever.MIN_HITS:
+        # Below the confidence bar — withhold and escalate (REQ-RAG-2,
+        # docs/hitl-plan.md): no grounded sources means no synthesis.
+        return {
+            "query": req.query,
+            "hits": hits,
+            "synthesis": None,
+            "needs_review": True,
+            "review_reason": (
+                "no hits at or above the retrieval confidence bar; "
+                "escalate to a human reviewer"
+            ),
+            "model": BEDROCK_MODEL_ID,
+        }
+
+    # Ground the synthesis in the retrieved excerpts ONLY — uncited model
+    # output must never sit beside citation-bearing hits as if it were
+    # authority (5 USC 552(b) / OIP foreseeable-harm conservatism).
+    excerpts = "\n\n".join(
+        f"[{hit['clause_id']}] {hit.get('cite') or hit['far_part']} — "
+        f"{hit['title']} ({hit['source_file']})\n{hit['text']}"
+        for hit in hits
     )
-    hits = [
-        {"clause_id": "5USC552-a6A", "title": "Time limits — 20 working days",
-         "score": 0.91, "far_part": "5 USC 552"},
-        {"clause_id": "5USC552-b5", "title": "Deliberative-process privilege",
-         "score": 0.87, "far_part": "5 USC 552"},
-    ][: req.top_k]
+    bedrock = invoke_model(
+        "Using ONLY the FOIA source excerpts below, summarize the statute / "
+        f"regulation relevant to: {req.query}\n\n"
+        f"Source excerpts:\n{excerpts}\n\n"
+        "Cite the bracketed clause_id for every statement. If the excerpts "
+        "do not address the query, say exactly that — do not draw on outside "
+        "knowledge.",
+        system=(
+            "You summarize 5 USC 552 / 28 CFR 16 provisions strictly from "
+            "the supplied excerpts; every claim must carry a bracketed "
+            "clause_id citation."
+        ),
+    )
     return {
         "query": req.query,
         "hits": hits,
         "synthesis": bedrock["body"],
+        "needs_review": False,
         "model": BEDROCK_MODEL_ID,
     }
 
