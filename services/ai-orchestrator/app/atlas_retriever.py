@@ -60,9 +60,6 @@ class RetrievalUnavailableError(RuntimeError):
     must surface this as a degraded state, never as an empty-but-OK result.
     """
 
-# TODO: once langchain-mongodb is in requirements.txt, replace this block with:
-#   from langchain_mongodb import MongoDBAtlasVectorSearch
-#   from langchain_aws import BedrockEmbeddings
 try:
     from langchain_mongodb import MongoDBAtlasVectorSearch  # type: ignore[import]
     _LANGCHAIN_MONGODB_AVAILABLE = True
@@ -70,7 +67,7 @@ except ImportError:
     _LANGCHAIN_MONGODB_AVAILABLE = False
     log.warning(
         "langchain-mongodb not installed — Atlas hybrid search unavailable. "
-        "Add langchain-mongodb to requirements.txt to enable."
+        "langchain-mongodb==0.11.0 is in requirements.txt; reinstall to enable."
     )
 
 try:
@@ -125,28 +122,58 @@ def clause_search(query: str, top_k: int = 5, far_part: str | None = None) -> li
 
 def _atlas_hybrid_search(query: str, top_k: int, far_part: str | None = None) -> list[dict[str, Any]]:
     """
-    TODO: implement after langchain-mongodb is installed and Atlas vector index exists.
-    far_part must become an exact-match pre-filter stage in the Atlas pipeline.
+    Atlas hybrid search via MongoDBAtlasVectorSearch + Titan v2 512-d embeddings.
 
-    Wire order:
-      embeddings = BedrockEmbeddings(
-          client=boto3.client("bedrock-runtime", region_name=AWS_REGION),
-          model_id="amazon.titan-embed-text-v2:0",
-          model_kwargs={"dimensions": 512, "normalize": True},
-      )
-      store = MongoDBAtlasVectorSearch(
-          collection=_get_collection(),
-          embedding=embeddings,
-          index_name="foia_precedent_vector",
-          text_key="text",
-          embedding_key="embedding",
-      )
-      retriever = store.as_retriever(search_type="similarity", search_kwargs={"k": top_k})
-      docs = retriever.invoke(query)
-      return [_doc_to_hit(d) for d in docs]
+    Requires:
+      - langchain-mongodb installed (import guard above)
+      - ATLAS_HYBRID_ENABLED=true env var (routing guard in clause_search)
+      - Atlas Search index "foia_precedent_vector" on the foia_precedent collection:
+          {"mappings": {"dynamic": false, "fields": {
+              "text": [{"type": "string"},
+                       {"type": "knnVector", "dimensions": 512, "similarity": "cosine"}]
+          }}}
+      - Corpus indexed with embeddings (scripts/index-foia-corpus.py --upsert
+        after adding Titan embedding generation to that script)
+
+    far_part is applied as a post-filter on the returned docs; Atlas pre-filter
+    support requires an $vectorSearch pipeline stage (W3 upgrade path).
     """
-    log.warning("_atlas_hybrid_search: langchain-mongodb present but not yet wired")
-    return []
+    import boto3
+
+    AWS_REGION = os.environ.get("AWS_REGION", "us-east-1")
+
+    try:
+        from langchain_aws import BedrockEmbeddings
+    except ImportError as exc:
+        raise RetrievalUnavailableError(
+            "langchain-aws not installed — required for Titan v2 embeddings"
+        ) from exc
+
+    embeddings = BedrockEmbeddings(
+        client=boto3.client("bedrock-runtime", region_name=AWS_REGION),
+        model_id="amazon.titan-embed-text-v2:0",
+        model_kwargs={"dimensions": 512, "normalize": True},
+    )
+    store = MongoDBAtlasVectorSearch(
+        collection=_get_collection(),
+        embedding=embeddings,
+        index_name="foia_precedent_vector",
+        text_key="text",
+        embedding_key="embedding",
+    )
+    search_kwargs: dict[str, Any] = {"k": top_k}
+    if far_part:
+        search_kwargs["pre_filter"] = {"far_part": {"$eq": far_part}}
+    lc_retriever = store.as_retriever(
+        search_type="similarity",
+        search_kwargs=search_kwargs,
+    )
+    try:
+        docs = lc_retriever.invoke(query)
+    except Exception as exc:
+        log.warning("Atlas hybrid search failed: %s", exc)
+        raise RetrievalUnavailableError(f"Atlas hybrid search failed: {exc}") from exc
+    return [_doc_to_hit(doc.metadata | {"text": doc.page_content}) for doc in docs]
 
 
 def _pymongo_text_search(query: str, top_k: int, far_part: str | None = None) -> list[dict[str, Any]]:
