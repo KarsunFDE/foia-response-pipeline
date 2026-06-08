@@ -94,14 +94,23 @@ def _get_collection():
         raise RetrievalUnavailableError(f"MongoDB connection failed: {exc}") from exc
 
 
-def clause_search(query: str, top_k: int = 5, far_part: str | None = None) -> list[dict[str, Any]]:
+def clause_search(query: str, top_k: int = 5, far_part: str | None = None,
+                  agency_id: str | None = None) -> list[dict[str, Any]]:
     """
     Search the FOIA precedent corpus; return hit records shaped for /rag/clause-search.
 
-    Each hit: {clause_id, title, score, far_part, cite, source_file, chunk_index, heading_path, text}
-    (text bounded to SNIPPET_MAX_CHARS).
+    Each hit: {clause_id, title, score, far_part, agency_id, cite, source_file,
+    chunk_index, heading_path, text} (text bounded to SNIPPET_MAX_CHARS).
 
     When far_part is provided, hits are restricted to that far_part cite prefix (exact match).
+
+    agency_id scopes multi-tenant retrieval over the shared foia_precedent
+    collection (REQ-RAG-3). A chunk with agency_id=None is SHARED federal
+    statute (5 USC 552 / 28 CFR 16) visible to every agency; a chunk with
+    agency_id="X" is agency-X-only. A request WITH agency_id="X" sees X's docs
+    plus shared statute; a request WITHOUT agency_id (None) FAILS CLOSED to
+    shared statute only — no agency-scoped doc leaks when the caller provides
+    no tenant context.
 
     Resolution order:
       1. Atlas hybrid search — ONLY when ATLAS_HYBRID_ENABLED is set (the
@@ -114,13 +123,14 @@ def clause_search(query: str, top_k: int = 5, far_part: str | None = None) -> li
     raises RetrievalUnavailableError instead.
     """
     if ATLAS_HYBRID_ENABLED and _LANGCHAIN_MONGODB_AVAILABLE:
-        hits = _atlas_hybrid_search(query, top_k, far_part=far_part)
+        hits = _atlas_hybrid_search(query, top_k, far_part=far_part, agency_id=agency_id)
     else:
-        hits = _pymongo_text_search(query, top_k, far_part=far_part)
+        hits = _pymongo_text_search(query, top_k, far_part=far_part, agency_id=agency_id)
     return [hit for hit in hits if hit["score"] >= MIN_SCORE]
 
 
-def _atlas_hybrid_search(query: str, top_k: int, far_part: str | None = None) -> list[dict[str, Any]]:
+def _atlas_hybrid_search(query: str, top_k: int, far_part: str | None = None,
+                         agency_id: str | None = None) -> list[dict[str, Any]]:
     """
     Atlas hybrid search via MongoDBAtlasVectorSearch + Titan v2 512-d embeddings.
 
@@ -135,8 +145,10 @@ def _atlas_hybrid_search(query: str, top_k: int, far_part: str | None = None) ->
       - Corpus indexed with embeddings (scripts/index-foia-corpus.py --upsert
         after adding Titan embedding generation to that script)
 
-    far_part is applied as a post-filter on the returned docs; Atlas pre-filter
-    support requires an $vectorSearch pipeline stage (W3 upgrade path).
+    far_part and agency_id are applied via the Atlas pre_filter. agency_id
+    enforces the same multi-tenant scoping as the lexical path: agency-X docs
+    plus shared (agency_id=None) statute when present, shared-only when absent
+    (fail-closed). See clause_search for the tenant model.
     """
     import boto3
 
@@ -162,8 +174,20 @@ def _atlas_hybrid_search(query: str, top_k: int, far_part: str | None = None) ->
         embedding_key="embedding",
     )
     search_kwargs: dict[str, Any] = {"k": top_k}
+    # Atlas pre_filter is the W3 upgrade path for tenant + far_part scoping
+    # (an $vectorSearch pipeline stage filter); kept consistent with the
+    # lexical path's intent below.
+    pre_filter: dict[str, Any] = {}
     if far_part:
-        search_kwargs["pre_filter"] = {"far_part": {"$eq": far_part}}
+        pre_filter["far_part"] = {"$eq": far_part}
+    if agency_id:
+        pre_filter["$or"] = [
+            {"agency_id": {"$eq": agency_id}},
+            {"agency_id": {"$eq": None}},
+        ]
+    else:
+        pre_filter["agency_id"] = {"$eq": None}
+    search_kwargs["pre_filter"] = pre_filter
     lc_retriever = store.as_retriever(
         search_type="similarity",
         search_kwargs=search_kwargs,
@@ -176,7 +200,8 @@ def _atlas_hybrid_search(query: str, top_k: int, far_part: str | None = None) ->
     return [_doc_to_hit(doc.metadata | {"text": doc.page_content}) for doc in docs]
 
 
-def _pymongo_text_search(query: str, top_k: int, far_part: str | None = None) -> list[dict[str, Any]]:
+def _pymongo_text_search(query: str, top_k: int, far_part: str | None = None,
+                         agency_id: str | None = None) -> list[dict[str, Any]]:
     """
     Lexical fallback via pymongo $text operator.
 
@@ -185,11 +210,20 @@ def _pymongo_text_search(query: str, top_k: int, far_part: str | None = None) ->
     unreachable, missing text index, auth failure) so callers can distinguish
     "retrieval is broken" from "search ran, no matches". Programming errors
     propagate unwrapped.
+
+    agency_id scopes the query to the caller's tenant: agency-X docs plus
+    shared (agency_id=None) statute, or shared-only when absent (fail-closed).
+    The agency predicate ANDs with $text and far_part as implicit top-level
+    AND. See clause_search for the tenant model.
     """
     coll = _get_collection()
     filter = {"$text": {"$search": query}}
     if far_part:
         filter["far_part"] = far_part
+    if agency_id:
+        filter["$or"] = [{"agency_id": agency_id}, {"agency_id": None}]
+    else:
+        filter["agency_id"] = None
     try:
         cursor = (
             coll.find(
@@ -222,6 +256,7 @@ def _doc_to_hit(doc: dict[str, Any]) -> dict[str, Any]:
         "title": doc.get("title", ""),
         "score": float(doc.get("score", 0.0)),
         "far_part": doc.get("far_part", ""),
+        "agency_id": doc.get("agency_id"),  # tenant scope for reviewer traceability
         # Grounding metadata — the synthesis prompt and reviewer traceability
         # (docs/hitl-plan.md) need the source text + citation, not just ids.
         "cite": doc.get("cite"),

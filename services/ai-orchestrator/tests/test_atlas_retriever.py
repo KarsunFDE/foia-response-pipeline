@@ -12,7 +12,7 @@ Contract summary (current implementation):
     filter on results. Propagates RetrievalUnavailableError.
 
 Covers:
-  - _doc_to_hit        — all 9 fields, defaults, score coercion, text truncation
+  - _doc_to_hit        — all fields (incl. agency_id), defaults, score coercion, text truncation
   - _get_collection    — raises on pymongo absent; raises on connection failure;
                          reuses singleton
   - _pymongo_text_search — happy path, RetrievalUnavailableError propagation,
@@ -44,7 +44,7 @@ def reset_mongo_client():
 # ---------------------------------------------------------------------------
 
 class TestDocToHit:
-    def test_full_doc_maps_all_nine_fields(self) -> None:
+    def test_full_doc_maps_all_fields(self) -> None:
         doc = {
             "clause_id": "5USC552-b5",
             "title": "Deliberative-process privilege",
@@ -55,6 +55,7 @@ class TestDocToHit:
             "chunk_index": 2,
             "heading_path": ["5 USC 552", "Exemptions", "(b)(5)"],
             "text": "The deliberative-process exemption applies...",
+            "agency_id": "DOJ",
         }
         assert retriever._doc_to_hit(doc) == {
             "clause_id": "5USC552-b5",
@@ -66,6 +67,9 @@ class TestDocToHit:
             "chunk_index": 2,
             "heading_path": ["5 USC 552", "Exemptions", "(b)(5)"],
             "text": "The deliberative-process exemption applies...",
+            # Multi-tenant boundary (Item 10): agency_id carried for reviewer
+            # traceability and so callers can confirm tenant scoping held.
+            "agency_id": "DOJ",
         }
 
     def test_missing_fields_use_safe_defaults(self) -> None:
@@ -79,6 +83,7 @@ class TestDocToHit:
         assert hit["chunk_index"] is None
         assert hit["heading_path"] == []
         assert hit["text"] == ""
+        assert hit["agency_id"] is None
 
     def test_score_coerced_to_float(self) -> None:
         hit = retriever._doc_to_hit({"score": "0.91"})
@@ -219,7 +224,7 @@ class TestClauseSearch:
         with patch.object(retriever, "_LANGCHAIN_MONGODB_AVAILABLE", False):
             with patch.object(retriever, "_pymongo_text_search", return_value=hits) as mock_lex:
                 result = retriever.clause_search("time limits", top_k=3)
-        mock_lex.assert_called_once_with("time limits", 3, far_part=None)
+        mock_lex.assert_called_once_with("time limits", 3, far_part=None, agency_id=None)
         assert result == hits
 
     def test_delegates_to_atlas_when_enabled_and_langchain_present(self) -> None:
@@ -227,7 +232,7 @@ class TestClauseSearch:
             with patch.object(retriever, "_LANGCHAIN_MONGODB_AVAILABLE", True):
                 with patch.object(retriever, "_atlas_hybrid_search", return_value=[]) as mock_atlas:
                     retriever.clause_search("exemptions", top_k=5)
-        mock_atlas.assert_called_once_with("exemptions", 5, far_part=None)
+        mock_atlas.assert_called_once_with("exemptions", 5, far_part=None, agency_id=None)
 
     def test_stays_on_lexical_when_langchain_present_but_hybrid_not_enabled(self) -> None:
         hits = [{"clause_id": "y", "score": 99.0}]
@@ -264,7 +269,7 @@ class TestClauseSearch:
         with patch.object(retriever, "_LANGCHAIN_MONGODB_AVAILABLE", False):
             with patch.object(retriever, "_pymongo_text_search", return_value=[]) as mock_lex:
                 retriever.clause_search("time limits", far_part="5 USC 552")
-        mock_lex.assert_called_once_with("time limits", 5, far_part="5 USC 552")
+        mock_lex.assert_called_once_with("time limits", 5, far_part="5 USC 552", agency_id=None)
 
     def test_default_top_k_is_five(self) -> None:
         with patch.object(retriever, "_LANGCHAIN_MONGODB_AVAILABLE", False):

@@ -23,6 +23,7 @@ Output JSONL schema per chunk:
     "title":        str | null, # H1 heading text
     "heading_path": list[str],  # breadcrumb from title → section label
     "far_part":     str | null, # "5 USC 552" or "28 CFR 16" derived from cite
+    "agency_id":    str | null, # frontmatter agency_id; null = shared federal statute (all agencies)
     "source_file":  str,        # filename, e.g. "5usc552-a6A-time-limits.md"
     "chunk_index":  int,        # 0-based position within the source file
     "topic":        str | null, # frontmatter topic or null
@@ -336,6 +337,9 @@ def chunk_file(path: Path) -> list[dict]:
     cite: str | None = fm.get("cite")
     topic: str | None = fm.get("topic") or None
     exemption: str | None = fm.get("exemption") or None
+    # null agency_id = shared federal statute (visible to all agencies); a
+    # value scopes the chunk to one agency (multi-tenant boundary, REQ-RAG-3).
+    agency_id: str | None = fm.get("agency_id") or None
     far_part = derive_far_part(cite)
     clause_id = path.stem
 
@@ -360,6 +364,7 @@ def chunk_file(path: Path) -> list[dict]:
                     "title": title,
                     "heading_path": heading_path,
                     "far_part": far_part,
+                    "agency_id": agency_id,
                     "source_file": path.name,
                     "chunk_index": chunk_index,
                     "topic": topic,

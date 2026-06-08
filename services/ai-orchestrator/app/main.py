@@ -40,6 +40,7 @@ from __future__ import annotations
 import logging
 import os
 import random
+import re
 from typing import Any
 
 from fastapi import FastAPI, HTTPException
@@ -70,6 +71,47 @@ log = logging.getLogger("ai-orchestrator")
 
 app = FastAPI(title="ai-orchestrator", version="0.1.0-brownfield")
 
+# Bracketed citation token, e.g. [5usc552-b-exemptions].
+_CITATION_RE = re.compile(r"\[([^\]]+)\]")
+
+
+def _validate_synthesis_citations(
+    body: str, allowed: set[str]
+) -> tuple[bool, str | None]:
+    """
+    Verify (not just prompt) that a Bedrock synthesis is grounded in the
+    retrieved hits. Prompt-only grounding is not FOIA traceability
+    (5 USC 552 / 28 CFR 16): a model can invent a clause_id or emit uncited
+    claims regardless of instructions.
+
+    Parse every bracketed token out of ``body`` and compare against the
+    ``allowed`` set of retrieved clause_ids. Fail-closed:
+
+      - ZERO bracketed citations -> uncited claims -> not traceable.
+      - ANY bracketed token not in ``allowed`` -> hallucinated/unknown
+        citation -> not traceable.
+
+    Returns ``(ok, reason)``: ``(True, None)`` when every bracketed citation
+    is present and known; ``(False, reason)`` otherwise, where ``reason``
+    explains the failure for the ``review_reason`` field.
+    """
+    tokens = [t.strip() for t in _CITATION_RE.findall(body)]
+    if not tokens:
+        return (
+            False,
+            "synthesis contained no bracketed clause_id citations; "
+            "uncited model output is not traceable authority",
+        )
+    unknown = [t for t in tokens if t not in allowed]
+    if unknown:
+        return (
+            False,
+            "synthesis cited clause_id(s) not present in the retrieved hits: "
+            f"{', '.join(sorted(set(unknown)))}; "
+            "unknown/hallucinated citations are not traceable authority",
+        )
+    return (True, None)
+
 
 class DraftRequest(BaseModel):
     """
@@ -92,7 +134,7 @@ class ClauseSearchRequest(BaseModel):
     """Hybrid RAG over the FOIA precedent corpus (5 USC 552 / 28 CFR 16). ⚠ Item 4 — no Field."""
     query: str
     far_part: str | None = None  # legacy field name; carries FOIA cite prefix (e.g. "5 USC 552")
-    agency_id: str | None = None  # ⚠ Item 10 surface — not enforced upstream
+    agency_id: str | None = None  # threaded into retrieval for multi-tenant scoping; fail-closed (shared statute only) when absent
     top_k: int = 5
 
 
@@ -252,7 +294,7 @@ def rag_clause_search(req: ClauseSearchRequest) -> dict[str, Any]:
     log.info("rag/clause-search query=%r far_part=%r top_k=%d",
              req.query[:60], req.far_part, req.top_k)
     try:
-        hits = atlas_retriever.clause_search(req.query, top_k=req.top_k, far_part=req.far_part)
+        hits = atlas_retriever.clause_search(req.query, top_k=req.top_k, far_part=req.far_part, agency_id=req.agency_id)
     except atlas_retriever.RetrievalUnavailableError as exc:
         # Infrastructure failure is NOT "no responsive precedent" — surface a
         # degraded state, and never emit synthesis off broken retrieval.
@@ -297,6 +339,22 @@ def rag_clause_search(req: ClauseSearchRequest) -> dict[str, Any]:
             "clause_id citation."
         ),
     )
+    # Prompt-only grounding is not traceability — VERIFY the synthesis cites
+    # only retrieved clause_ids before treating it as authoritative. invoke_model
+    # already ran (we can't un-call it); we just refuse to trust an unverifiable
+    # body. Fail-closed: unknown citation OR zero citations -> escalate.
+    allowed = {hit["clause_id"] for hit in hits}
+    ok, review_reason = _validate_synthesis_citations(bedrock["body"], allowed)
+    if not ok:
+        return {
+            "query": req.query,
+            "hits": hits,
+            "synthesis": None,
+            "needs_review": True,
+            "review_reason": review_reason,
+            "model": BEDROCK_MODEL_ID,
+        }
+
     return {
         "query": req.query,
         "hits": hits,

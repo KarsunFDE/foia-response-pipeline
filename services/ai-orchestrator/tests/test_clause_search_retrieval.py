@@ -41,7 +41,7 @@ def test_clause_search_drops_hits_below_min_score(monkeypatch):
     monkeypatch.setattr(atlas_retriever, "MIN_SCORE", 1.0)
     monkeypatch.setattr(
         atlas_retriever, "_pymongo_text_search",
-        lambda query, top_k, far_part=None: [
+        lambda query, top_k, far_part=None, agency_id=None: [
             _hit(score=2.0), _hit(clause_id="weak", score=0.1)],
     )
     hits = atlas_retriever.clause_search("exemption", top_k=5)
@@ -55,9 +55,9 @@ def test_import_availability_alone_does_not_route_to_hybrid_stub(monkeypatch):
     monkeypatch.setattr(atlas_retriever, "_LANGCHAIN_MONGODB_AVAILABLE", True)
     monkeypatch.setattr(atlas_retriever, "ATLAS_HYBRID_ENABLED", False)
     monkeypatch.setattr(atlas_retriever, "_pymongo_text_search",
-                        lambda query, top_k, far_part=None: [_hit()])
+                        lambda query, top_k, far_part=None, agency_id=None: [_hit()])
 
-    def _must_not_be_reached(query, top_k, far_part=None):
+    def _must_not_be_reached(query, top_k, far_part=None, agency_id=None):
         raise AssertionError(
             "hybrid stub reached without ATLAS_HYBRID_ENABLED")
 
@@ -71,7 +71,7 @@ def test_hybrid_path_used_only_when_explicitly_enabled(monkeypatch):
     monkeypatch.setattr(atlas_retriever, "_LANGCHAIN_MONGODB_AVAILABLE", True)
     monkeypatch.setattr(atlas_retriever, "ATLAS_HYBRID_ENABLED", True)
     monkeypatch.setattr(atlas_retriever, "_atlas_hybrid_search",
-                        lambda query, top_k, far_part=None: [
+                        lambda query, top_k, far_part=None, agency_id=None: [
                             _hit(clause_id="hybrid")])
     hits = atlas_retriever.clause_search("exemption")
     assert hits[0]["clause_id"] == "hybrid"
@@ -90,7 +90,7 @@ def test_infra_failure_raises_retrieval_unavailable(monkeypatch):
 
 
 def test_endpoint_returns_503_on_retrieval_failure(monkeypatch):
-    def _broken(query, top_k=5, far_part=None):
+    def _broken(query, top_k=5, far_part=None, agency_id=None):
         raise atlas_retriever.RetrievalUnavailableError(
             "MongoDB connection failed")
 
@@ -106,7 +106,7 @@ def test_endpoint_returns_503_on_retrieval_failure(monkeypatch):
 
 def test_endpoint_escalates_below_confidence_bar(monkeypatch):
     monkeypatch.setattr(atlas_retriever, "clause_search",
-                        lambda query, top_k=5, far_part=None: [])
+                        lambda query, top_k=5, far_part=None, agency_id=None: [])
     invoked = []
     monkeypatch.setattr(app_main, "invoke_model",
                         lambda *a, **k: invoked.append(a) or {"body": "x"})
@@ -121,7 +121,7 @@ def test_endpoint_escalates_below_confidence_bar(monkeypatch):
 def test_endpoint_synthesis_grounded_in_retrieved_excerpts(monkeypatch):
     hit = _hit(text="Records compiled for law enforcement purposes.")
     monkeypatch.setattr(atlas_retriever, "clause_search",
-                        lambda query, top_k=5, far_part=None: [hit])
+                        lambda query, top_k=5, far_part=None, agency_id=None: [hit])
     prompts = []
 
     def _fake_invoke(prompt, **kwargs):
@@ -147,7 +147,7 @@ def test_clause_search_forwards_far_part_to_pymongo(monkeypatch):
     monkeypatch.setattr(atlas_retriever, "ATLAS_HYBRID_ENABLED", False)
     captured = {}
 
-    def _fake_search(query, top_k, far_part=None):
+    def _fake_search(query, top_k, far_part=None, agency_id=None):
         captured["query"] = query
         captured["top_k"] = top_k
         captured["far_part"] = far_part
@@ -162,7 +162,7 @@ def test_endpoint_forwards_far_part_to_clause_search(monkeypatch):
     # POST body far_part must reach clause_search as a kwarg.
     captured = {}
 
-    def _fake_clause_search(query, top_k=5, far_part=None):
+    def _fake_clause_search(query, top_k=5, far_part=None, agency_id=None):
         captured["query"] = query
         captured["top_k"] = top_k
         captured["far_part"] = far_part
@@ -179,7 +179,7 @@ def test_endpoint_forwards_far_part_to_clause_search(monkeypatch):
 
 def test_endpoint_success_response_shape(monkeypatch):
     monkeypatch.setattr(atlas_retriever, "clause_search",
-                        lambda query, top_k=5, far_part=None: [_hit()])
+                        lambda query, top_k=5, far_part=None, agency_id=None: [_hit()])
     monkeypatch.setattr(app_main, "invoke_model",
                         lambda *a, **k: {"body": "[5usc552-b-exemptions] summary"})
     resp = client.post("/rag/clause-search", json={"query": "exemption"})
@@ -195,7 +195,7 @@ def test_endpoint_escalation_response_shape(monkeypatch):
     # Sub-confidence-bar path carries the extra review_reason key and never
     # synthesizes.
     monkeypatch.setattr(atlas_retriever, "clause_search",
-                        lambda query, top_k=5, far_part=None: [])
+                        lambda query, top_k=5, far_part=None, agency_id=None: [])
     monkeypatch.setattr(app_main, "invoke_model",
                         lambda *a, **k: {"body": "should not be called"})
     resp = client.post("/rag/clause-search", json={"query": "exemption"})
@@ -205,6 +205,78 @@ def test_endpoint_escalation_response_shape(monkeypatch):
         "query", "hits", "synthesis", "needs_review", "review_reason", "model"}
     assert body["needs_review"] is True
     assert body["synthesis"] is None
+
+
+def test_endpoint_escalates_on_hallucinated_citation(monkeypatch):
+    # Model invents a clause_id that is not in the retrieved hit set — this is
+    # not traceable authority, so the synthesis must be withheld + escalated.
+    monkeypatch.setattr(atlas_retriever, "clause_search",
+                        lambda query, top_k=5, far_part=None, agency_id=None: [_hit()])
+    monkeypatch.setattr(app_main, "invoke_model",
+                        lambda *a, **k: {"body": "[hallucinated-clause] made-up text"})
+    resp = client.post("/rag/clause-search", json={"query": "exemption"})
+    assert resp.status_code == 200
+    body = resp.json()
+    assert body["needs_review"] is True
+    assert body["synthesis"] is None
+    assert body["review_reason"]
+    assert set(body.keys()) == {
+        "query", "hits", "synthesis", "needs_review", "review_reason", "model"}
+
+
+def test_endpoint_escalates_on_uncited_synthesis(monkeypatch):
+    # Model emits zero bracketed citations — uncited claims are not traceable.
+    monkeypatch.setattr(atlas_retriever, "clause_search",
+                        lambda query, top_k=5, far_part=None, agency_id=None: [_hit()])
+    monkeypatch.setattr(app_main, "invoke_model",
+                        lambda *a, **k: {"body": "uncited summary text"})
+    resp = client.post("/rag/clause-search", json={"query": "exemption"})
+    assert resp.status_code == 200
+    body = resp.json()
+    assert body["needs_review"] is True
+    assert body["synthesis"] is None
+    assert body["review_reason"]
+
+
+def test_endpoint_accepts_when_all_citations_in_hit_set(monkeypatch):
+    # Multiple hits, body cites both clause_ids — fully grounded, so the
+    # synthesis is returned as authoritative.
+    hits = [_hit(clause_id="5usc552-b-exemptions"),
+            _hit(clause_id="28cfr16-6-determinations")]
+    monkeypatch.setattr(atlas_retriever, "clause_search",
+                        lambda query, top_k=5, far_part=None, agency_id=None: hits)
+    body_text = ("[5usc552-b-exemptions] exemptions apply. "
+                 "[28cfr16-6-determinations] determination basis.")
+    monkeypatch.setattr(app_main, "invoke_model",
+                        lambda *a, **k: {"body": body_text})
+    resp = client.post("/rag/clause-search", json={"query": "exemption"})
+    assert resp.status_code == 200
+    body = resp.json()
+    assert body["needs_review"] is False
+    assert body["synthesis"] == body_text
+
+
+def test_validate_synthesis_citations_helper():
+    allowed = {"5usc552-b-exemptions", "28cfr16-6-determinations"}
+    # Pass: every bracketed citation is in the allowed set.
+    ok, reason = app_main._validate_synthesis_citations(
+        "[5usc552-b-exemptions] grounded. [28cfr16-6-determinations] ok.", allowed)
+    assert ok is True
+    assert reason is None
+    # Whitespace inside brackets is stripped before comparison.
+    ok, reason = app_main._validate_synthesis_citations(
+        "[ 5usc552-b-exemptions ] padded.", allowed)
+    assert ok is True
+    # Fail: unknown/hallucinated citation.
+    ok, reason = app_main._validate_synthesis_citations(
+        "[hallucinated-clause] made-up.", allowed)
+    assert ok is False
+    assert reason
+    # Fail: zero bracketed citations.
+    ok, reason = app_main._validate_synthesis_citations(
+        "uncited summary text", allowed)
+    assert ok is False
+    assert reason
 
 
 def test_doc_to_hit_includes_traceability_fields():
@@ -229,3 +301,87 @@ def test_doc_to_hit_bounds_snippet_text(monkeypatch):
     monkeypatch.setattr(atlas_retriever, "SNIPPET_MAX_CHARS", 50)
     hit = atlas_retriever._doc_to_hit({"text": "y" * 500})
     assert len(hit["text"]) == 50
+
+
+# ---------------------------------------------------------------------------
+# Multi-tenant boundary (Item 10): agency_id must thread through retrieval and
+# scope the Mongo predicate so one agency cannot retrieve another's precedent
+# over the shared foia_precedent collection (REQ-RAG-3).
+# ---------------------------------------------------------------------------
+
+class _FakeCollection:
+    """Captures the find() filter; returns a chainable empty cursor stub."""
+
+    def __init__(self):
+        self.filter = None
+
+    def find(self, filter, projection):
+        self.filter = filter
+        return self
+
+    def sort(self, *a):
+        return self
+
+    def limit(self, n):
+        return iter([])
+
+
+def test_clause_search_forwards_agency_id_to_pymongo(monkeypatch):
+    # agency_id is a tenant scope; clause_search must thread it through to the
+    # lexical search rather than dropping it (mirrors the far_part test).
+    monkeypatch.setattr(atlas_retriever, "ATLAS_HYBRID_ENABLED", False)
+    captured = {}
+
+    def _fake_search(query, top_k, far_part=None, agency_id=None):
+        captured["query"] = query
+        captured["top_k"] = top_k
+        captured["far_part"] = far_part
+        captured["agency_id"] = agency_id
+        return [_hit()]
+
+    monkeypatch.setattr(atlas_retriever, "_pymongo_text_search", _fake_search)
+    atlas_retriever.clause_search("x", agency_id="DOJ")
+    assert captured["agency_id"] == "DOJ"
+
+
+def test_endpoint_forwards_agency_id_to_clause_search(monkeypatch):
+    # POST body agency_id must reach clause_search as a kwarg.
+    captured = {}
+
+    def _fake_clause_search(query, top_k=5, far_part=None, agency_id=None):
+        captured["query"] = query
+        captured["top_k"] = top_k
+        captured["far_part"] = far_part
+        captured["agency_id"] = agency_id
+        return [_hit()]
+
+    monkeypatch.setattr(atlas_retriever, "clause_search", _fake_clause_search)
+    monkeypatch.setattr(app_main, "invoke_model",
+                        lambda *a, **k: {"body": "stub synthesis"})
+    resp = client.post("/rag/clause-search",
+                       json={"query": "exemption", "agency_id": "DOJ"})
+    assert resp.status_code == 200
+    assert captured["agency_id"] == "DOJ"
+
+
+def test_pymongo_filter_scopes_to_agency_and_shared(monkeypatch):
+    # With agency_id="DOJ" the Mongo predicate must match DOJ docs OR shared
+    # (agency_id=None) statute — and NOTHING ELSE. An "EPA" doc has
+    # agency_id="EPA", which is in neither branch, proving cross-tenant
+    # exclusion at the query level.
+    fake = _FakeCollection()
+    monkeypatch.setattr(atlas_retriever, "_get_collection", lambda: fake)
+    atlas_retriever._pymongo_text_search("q", 5, agency_id="DOJ")
+    assert fake.filter["$or"] == [{"agency_id": "DOJ"}, {"agency_id": None}]
+    assert "agency_id" not in fake.filter  # scoped via $or, not a bare match
+
+
+def test_pymongo_filter_failclosed_without_agency(monkeypatch):
+    # No agency_id => fail closed: only shared (agency_id=None) statute is
+    # retrievable; no agency-scoped doc may leak when there is no tenant
+    # context.
+    fake = _FakeCollection()
+    monkeypatch.setattr(atlas_retriever, "_get_collection", lambda: fake)
+    atlas_retriever._pymongo_text_search("q", 5)
+    assert fake.filter["agency_id"] is None
+    assert "$or" not in fake.filter
