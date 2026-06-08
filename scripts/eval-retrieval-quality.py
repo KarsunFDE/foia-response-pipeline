@@ -7,7 +7,7 @@ NOT collected by pytest (lives in scripts/, requires a live Mongo + an
 indexed corpus).
 
 Prerequisites:
-  1. Mongo running:   docker compose -f infra/docker/docker-compose.yml up -d mongo
+  1. Mongo running:   docker compose -f infra/docker/docker-compose.yml up -d mongodb
   2. Corpus indexed:  python scripts/index-foia-corpus.py --upsert --yes
      (creates the foia_precedent collection + text index)
 
