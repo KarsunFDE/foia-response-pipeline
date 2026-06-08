@@ -197,7 +197,15 @@ def test_chunk_file_frontmatter_only_no_body(tmp_path):
 # _upsert_to_mongo against an injected fake pymongo
 # ---------------------------------------------------------------------------
 
-class _FakeBulkWriteError(Exception):
+class _FakePyMongoError(Exception):
+    """Base mirror of pymongo.errors.PyMongoError."""
+
+
+class _FakeAutoReconnect(_FakePyMongoError):
+    """Non-bulk PyMongoError (network blip) — NOT a BulkWriteError."""
+
+
+class _FakeBulkWriteError(_FakePyMongoError):
     def __init__(self, details):
         super().__init__("fake bulk write error")
         self.details = details
@@ -208,7 +216,8 @@ class _FakeCollection:
         self.delete_filters = []
         self.bulk_ops = []
         self.create_index_calls = []
-        # When set, bulk_write raises this after recording its ops.
+        # When set, bulk_write raises this after recording its ops. May be a
+        # BulkWriteError or a non-bulk PyMongoError (e.g. AutoReconnect).
         self.bulk_write_error = None
 
     def delete_many(self, filt):
@@ -220,8 +229,8 @@ class _FakeCollection:
         if self.bulk_write_error is not None:
             raise self.bulk_write_error
 
-    def create_index(self, keys, name=None):
-        self.create_index_calls.append((keys, name))
+    def create_index(self, keys, name=None, unique=False):
+        self.create_index_calls.append((keys, name, unique))
 
     def count_documents(self, filt):
         return 7
@@ -252,6 +261,13 @@ class _InsertOne:
         self.doc = doc
 
 
+class _ReplaceOne:
+    def __init__(self, filter, replacement, upsert=False):
+        self.filter = filter
+        self.replacement = replacement
+        self.upsert = upsert
+
+
 def _install_fake_pymongo(monkeypatch):
     coll = _FakeCollection()
     db = _FakeDB(coll)
@@ -260,19 +276,26 @@ def _install_fake_pymongo(monkeypatch):
     fake = type(sys)("pymongo")
     fake.MongoClient = lambda *a, **k: client
     fake.InsertOne = _InsertOne
+    fake.ReplaceOne = _ReplaceOne
     fake.TEXT = "text"
-    # Real pymongo exposes BulkWriteError under pymongo.errors; mirror that so
-    # the impl's `except pymongo.errors.BulkWriteError` resolves.
-    fake.errors = types.SimpleNamespace(BulkWriteError=_FakeBulkWriteError)
+    fake.ASCENDING = 1
+    # Real pymongo exposes BulkWriteError (a PyMongoError subclass) under
+    # pymongo.errors; mirror that hierarchy so the impl's
+    # `except BulkWriteError` resolves before the broader `except PyMongoError`.
+    fake.errors = types.SimpleNamespace(
+        PyMongoError=_FakePyMongoError,
+        BulkWriteError=_FakeBulkWriteError,
+        AutoReconnect=_FakeAutoReconnect,
+    )
     monkeypatch.setitem(sys.modules, "pymongo", fake)
     return client, db, coll
 
 
 def _chunks():
     return [
-        {"source_file": "b.md", "clause_id": "b", "text": "beta body"},
-        {"source_file": "a.md", "clause_id": "a", "text": "alpha body"},
-        {"source_file": "a.md", "clause_id": "a", "text": "alpha body two"},
+        {"source_file": "b.md", "clause_id": "b", "chunk_index": 0, "text": "beta body"},
+        {"source_file": "a.md", "clause_id": "a", "chunk_index": 0, "text": "alpha body"},
+        {"source_file": "a.md", "clause_id": "a", "chunk_index": 1, "text": "alpha body two"},
     ]
 
 
@@ -285,11 +308,13 @@ def test_upsert_default_mode_scoped_delete_before_bulk_write(monkeypatch):
     assert coll.delete_filters == [{"source_file": {"$in": ["a.md", "b.md"]}}]
     # delete recorded before bulk_write populated the ops.
     assert len(coll.bulk_ops) == 3
-    # text index created.
+    # text index created (after the unique compound index).
     assert coll.create_index_calls
-    keys, name = coll.create_index_calls[0]
-    assert keys == [("text", "text")]
-    assert name == "foia_text_search"
+    text_index = [
+        (keys, name) for keys, name, _unique in coll.create_index_calls
+        if name == "foia_text_search"
+    ]
+    assert text_index == [([("text", "text")], "foia_text_search")]
 
 
 def test_upsert_replace_mode_clears_collection(monkeypatch):
@@ -302,7 +327,7 @@ def test_upsert_replace_mode_clears_collection(monkeypatch):
 def test_upsert_stamps_shared_run_id_and_indexed_at(monkeypatch):
     _client, _db, coll = _install_fake_pymongo(monkeypatch)
     idx._upsert_to_mongo(_chunks(), "mongodb://localhost:27017", "testdb")
-    docs = [op.doc for op in coll.bulk_ops]
+    docs = [op.replacement for op in coll.bulk_ops]
     run_ids = {d["run_id"] for d in docs}
     assert len(run_ids) == 1  # one shared run_id across the run
     only = run_ids.pop()
@@ -340,16 +365,74 @@ def test_upsert_partial_bulk_failure_cleans_up_run(monkeypatch):
 
     # (b) a run_id-scoped delete_many ran AFTER the bulk_write attempt.
     assert coll.bulk_ops, "bulk_write should have been attempted"
-    run_id = coll.bulk_ops[0].doc["run_id"]
+    run_id = coll.bulk_ops[0].replacement["run_id"]
+    assert coll.delete_filters[-1] == {"run_id": run_id}
+    assert len(run_id) == 32
+    int(run_id, 16)  # valid hex
+
+    # (c) the text index was never created after a failed load (the unique
+    # compound index is created before the write, so only it may be present).
+    assert not any(
+        name == "foia_text_search" for _keys, name, _unique in coll.create_index_calls
+    )
+
+    # (d) exception chaining preserved.
+    assert excinfo.value.__cause__ is coll.bulk_write_error
+
+
+def test_upsert_creates_unique_compound_index(monkeypatch):
+    _client, _db, coll = _install_fake_pymongo(monkeypatch)
+    idx._upsert_to_mongo(_chunks(), "mongodb://localhost:27017", "testdb")
+    unique = [
+        (keys, name, uniq) for keys, name, uniq in coll.create_index_calls
+        if name == "uniq_source_chunk"
+    ]
+    assert unique == [
+        ([("source_file", 1), ("chunk_index", 1)], "uniq_source_chunk", True)
+    ]
+
+
+def test_upsert_uses_replace_one_upsert(monkeypatch):
+    _client, _db, coll = _install_fake_pymongo(monkeypatch)
+    idx._upsert_to_mongo(_chunks(), "mongodb://localhost:27017", "testdb")
+    assert coll.bulk_ops, "bulk_write should have been attempted"
+    for op in coll.bulk_ops:
+        assert isinstance(op, _ReplaceOne)
+        assert op.upsert is True
+        assert op.filter == {
+            "source_file": op.replacement["source_file"],
+            "chunk_index": op.replacement["chunk_index"],
+        }
+
+
+def test_upsert_non_bulkwrite_pymongo_error_cleans_up_run(monkeypatch):
+    # Issue A: a non-bulk PyMongoError (AutoReconnect/NetworkTimeout/etc.) must
+    # still trigger run_id cleanup and surface as a wrapped RuntimeError.
+    _client, _db, coll = _install_fake_pymongo(monkeypatch)
+    injected = sys.modules["pymongo"].errors.AutoReconnect("network blip")
+    coll.bulk_write_error = injected
+
+    with pytest.raises(RuntimeError) as excinfo:
+        idx._upsert_to_mongo(_chunks(), "mongodb://localhost", "db")
+
+    # (a) message notes cleanup.
+    msg = str(excinfo.value)
+    assert "cleaned up partial run" in msg
+
+    # (b) a run_id-scoped delete_many fired AFTER the bulk_write attempt.
+    assert coll.bulk_ops, "bulk_write should have been attempted"
+    run_id = coll.bulk_ops[0].replacement["run_id"]
     assert coll.delete_filters[-1] == {"run_id": run_id}
     assert len(run_id) == 32
     int(run_id, 16)  # valid hex
 
     # (c) the text index was never created after a failed load.
-    assert coll.create_index_calls == []
+    assert not any(
+        name == "foia_text_search" for _keys, name, _unique in coll.create_index_calls
+    )
 
-    # (d) exception chaining preserved.
-    assert excinfo.value.__cause__ is coll.bulk_write_error
+    # (d) the raw driver error is preserved as the cause.
+    assert excinfo.value.__cause__ is injected
 
 
 # ---------------------------------------------------------------------------

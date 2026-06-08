@@ -387,18 +387,27 @@ def _upsert_to_mongo(chunks: list[dict], mongo_url: str, db_name: str,
     """
     Load chunks into the target collection, then create a text index.
 
-    Delete-then-insert, scoped to the source files present in this run:
+    Delete-then-replace, scoped to the source files present in this run:
     stale chunks (a file that shrank from 5 chunks to 3, or whose content
-    moved) are removed before the fresh chunks are inserted, so re-runs are
+    moved) are removed before the fresh chunks are written, so re-runs are
     idempotent for re-indexed files. Chunks from source files that were
     deleted or renamed since the last run are only removed by replace=True,
     which clears the entire collection first.
 
+    Chunk identity is guarded by a UNIQUE compound index on
+    (source_file, chunk_index), created before the write so duplicate chunk
+    identities are rejected at the database level. The write uses ReplaceOne
+    upserts keyed on that same (source_file, chunk_index) pair (ordered=False),
+    so two overlapping/concurrent runs converge to exactly one copy per chunk
+    instead of inserting duplicates.
+
     Every document is stamped with a shared run_id (uuid4 hex) and an
     indexed_at UTC timestamp so a corpus run can be identified and audited.
-    On a partial bulk-write failure the run's documents are deleted (by
-    run_id) and the error re-raised — the collection is left without the
-    affected source files until a clean re-run.
+    On ANY write failure — a partial BulkWriteError or a non-bulk PyMongoError
+    such as AutoReconnect/NetworkTimeout/ServerSelectionTimeoutError — the
+    run's documents are deleted (by run_id) and the error wrapped in a
+    RuntimeError and re-raised, so no partial inserts linger. The collection
+    is left without the affected source files until a clean re-run.
     Returns the count of documents in the collection after the load.
     """
     import uuid
@@ -419,18 +428,52 @@ def _upsert_to_mongo(chunks: list[dict], mongo_url: str, db_name: str,
         source_files = sorted({c["source_file"] for c in stamped})
         coll.delete_many({"source_file": {"$in": source_files}})
 
+    # Guard chunk identity at the DB level before writing: a UNIQUE compound
+    # index on (source_file, chunk_index) rejects duplicate chunks even when
+    # overlapping runs interleave. Idempotent across runs; the scoped
+    # delete-by-source_file above already ran, so re-creating is safe.
+    coll.create_index(
+        [("source_file", pymongo.ASCENDING), ("chunk_index", pymongo.ASCENDING)],
+        name="uniq_source_chunk",
+        unique=True,
+    )
+
     try:
-        coll.bulk_write([pymongo.InsertOne(c) for c in stamped], ordered=False)
+        # ReplaceOne upserts keyed on the unique (source_file, chunk_index)
+        # pair: concurrent/overlapping runs converge to one copy per chunk
+        # instead of duplicating.
+        coll.bulk_write(
+            [
+                pymongo.ReplaceOne(
+                    {"source_file": c["source_file"], "chunk_index": c["chunk_index"]},
+                    c,
+                    upsert=True,
+                )
+                for c in stamped
+            ],
+            ordered=False,
+        )
     except pymongo.errors.BulkWriteError as exc:
-        # Partial inserts would leave a mixed old/new corpus (the run's old
+        # Partial writes would leave a mixed old/new corpus (the run's old
         # source_file docs are already deleted). Remove everything this run
         # wrote, then surface the failure — a clean re-run re-indexes the
         # affected files in full.
         coll.delete_many({"run_id": run_id})
         write_errors = exc.details.get("writeErrors", []) if exc.details else []
         raise RuntimeError(
-            f"bulk insert failed ({len(write_errors)} write error(s)); "
+            f"bulk write failed ({len(write_errors)} write error(s)); "
             f"cleaned up partial run {run_id}. First errors: {write_errors[:3]}"
+        ) from exc
+    except pymongo.errors.PyMongoError as exc:
+        # A non-bulk failure (AutoReconnect / NetworkTimeout /
+        # ServerSelectionTimeoutError) is still a PyMongoError but not a
+        # BulkWriteError, so the docstring's cleanup-on-failure promise would
+        # otherwise be skipped. Remove this run's partial inserts and wrap the
+        # raw driver error so callers see a clean failure, not a leaked corpus.
+        coll.delete_many({"run_id": run_id})
+        raise RuntimeError(
+            f"bulk write failed ({type(exc).__name__}: {exc}); "
+            f"cleaned up partial run {run_id}."
         ) from exc
 
     coll.create_index([("text", pymongo.TEXT)], name="foia_text_search")
