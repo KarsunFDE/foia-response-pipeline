@@ -36,11 +36,29 @@ def _hit(clause_id: str = "5usc552-b-exemptions", score: float = 2.0,
     }
 
 
-def test_clause_search_drops_hits_below_min_score(monkeypatch):
+def test_clause_search_lexical_returns_topk_without_absolute_cut(monkeypatch):
+    # Lexical path: $text scores are uncalibrated, so NO absolute MIN_SCORE cut
+    # is applied. _pymongo_text_search already sorts by textScore + limits to
+    # top_k; clause_search returns those ranked hits as-is, even sub-MIN_SCORE.
     monkeypatch.setattr(atlas_retriever, "ATLAS_HYBRID_ENABLED", False)
     monkeypatch.setattr(atlas_retriever, "MIN_SCORE", 1.0)
     monkeypatch.setattr(
         atlas_retriever, "_pymongo_text_search",
+        lambda query, top_k, far_part=None, agency_id=None: [
+            _hit(score=2.0), _hit(clause_id="weak", score=0.1)],
+    )
+    hits = atlas_retriever.clause_search("exemption", top_k=5)
+    assert [h["clause_id"] for h in hits] == ["5usc552-b-exemptions", "weak"]
+
+
+def test_clause_search_hybrid_applies_min_score(monkeypatch):
+    # Hybrid path: cosine similarity is calibrated, so the absolute MIN_SCORE
+    # floor IS meaningful — sub-MIN_SCORE hits are dropped.
+    monkeypatch.setattr(atlas_retriever, "ATLAS_HYBRID_ENABLED", True)
+    monkeypatch.setattr(atlas_retriever, "_LANGCHAIN_MONGODB_AVAILABLE", True)
+    monkeypatch.setattr(atlas_retriever, "MIN_SCORE", 1.0)
+    monkeypatch.setattr(
+        atlas_retriever, "_atlas_hybrid_search",
         lambda query, top_k, far_part=None, agency_id=None: [
             _hit(score=2.0), _hit(clause_id="weak", score=0.1)],
     )
@@ -119,6 +137,8 @@ def test_endpoint_escalates_below_confidence_bar(monkeypatch):
 
 
 def test_endpoint_synthesis_grounded_in_retrieved_excerpts(monkeypatch):
+    # Simulate the calibrated hybrid path so synthesis can be authoritative.
+    monkeypatch.setattr(atlas_retriever, "lexical_path_active", lambda: False)
     hit = _hit(text="Records compiled for law enforcement purposes.")
     monkeypatch.setattr(atlas_retriever, "clause_search",
                         lambda query, top_k=5, far_part=None, agency_id=None: [hit])
@@ -178,6 +198,8 @@ def test_endpoint_forwards_far_part_to_clause_search(monkeypatch):
 
 
 def test_endpoint_success_response_shape(monkeypatch):
+    # Calibrated path -> authoritative synthesis (no mandatory review).
+    monkeypatch.setattr(atlas_retriever, "lexical_path_active", lambda: False)
     monkeypatch.setattr(atlas_retriever, "clause_search",
                         lambda query, top_k=5, far_part=None, agency_id=None: [_hit()])
     monkeypatch.setattr(app_main, "invoke_model",
@@ -241,6 +263,8 @@ def test_endpoint_escalates_on_uncited_synthesis(monkeypatch):
 def test_endpoint_accepts_when_all_citations_in_hit_set(monkeypatch):
     # Multiple hits, body cites both clause_ids — fully grounded, so the
     # synthesis is returned as authoritative.
+    # Calibrated path -> authoritative synthesis (no mandatory review).
+    monkeypatch.setattr(atlas_retriever, "lexical_path_active", lambda: False)
     hits = [_hit(clause_id="5usc552-b-exemptions"),
             _hit(clause_id="28cfr16-6-determinations")]
     monkeypatch.setattr(atlas_retriever, "clause_search",
@@ -254,6 +278,29 @@ def test_endpoint_accepts_when_all_citations_in_hit_set(monkeypatch):
     body = resp.json()
     assert body["needs_review"] is False
     assert body["synthesis"] == body_text
+
+
+def test_endpoint_lexical_path_forces_mandatory_review(monkeypatch):
+    # Lexical fallback path (the default module state): even when citation
+    # validation PASSES (the bracketed citation is in the hit set), the
+    # uncalibrated $text scores mean synthesis is not authoritative on its own —
+    # it must be gated behind mandatory human review. The body is still returned
+    # so the reviewer can validate it.
+    monkeypatch.setattr(atlas_retriever, "lexical_path_active", lambda: True)
+    monkeypatch.setattr(atlas_retriever, "clause_search",
+                        lambda query, top_k=5, far_part=None, agency_id=None: [_hit()])
+    body_text = "[5usc552-b-exemptions] grounded summary"
+    monkeypatch.setattr(app_main, "invoke_model",
+                        lambda *a, **k: {"body": body_text})
+    resp = client.post("/rag/clause-search", json={"query": "exemption"})
+    assert resp.status_code == 200
+    body = resp.json()
+    assert body["needs_review"] is True
+    assert body["synthesis"] == body_text  # non-null; provided for the reviewer
+    assert "uncalibrated" in body["review_reason"]
+    assert "review" in body["review_reason"]
+    assert set(body.keys()) == {
+        "query", "hits", "synthesis", "needs_review", "review_reason", "model"}
 
 
 def test_validate_synthesis_citations_helper():

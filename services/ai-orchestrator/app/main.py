@@ -345,13 +345,36 @@ def rag_clause_search(req: ClauseSearchRequest) -> dict[str, Any]:
     # body. Fail-closed: unknown citation OR zero citations -> escalate.
     allowed = {hit["clause_id"] for hit in hits}
     ok, review_reason = _validate_synthesis_citations(bedrock["body"], allowed)
+
+    # Final gating. The lexical $text fallback produces uncalibrated scores
+    # (Mongo $text is not normalized confidence), so synthesis off that path is
+    # never authoritative on its own — a human reviewer must validate it
+    # (docs/hitl-plan.md, FOIA-conservative). The calibrated Atlas hybrid path
+    # may stand on its own once citations check out.
+    mandatory_review = atlas_retriever.lexical_path_active()
     if not ok:
+        # Citation validation failed (batch-1): withhold the body entirely.
         return {
             "query": req.query,
             "hits": hits,
             "synthesis": None,
             "needs_review": True,
             "review_reason": review_reason,
+            "model": BEDROCK_MODEL_ID,
+        }
+    if mandatory_review:
+        # Lexical fallback: citations are valid, but scores are uncalibrated —
+        # provide the body for the reviewer, gated behind mandatory review.
+        return {
+            "query": req.query,
+            "hits": hits,
+            "synthesis": bedrock["body"],
+            "needs_review": True,
+            "review_reason": (
+                "lexical-fallback retrieval scores are uncalibrated "
+                "(Mongo $text is not normalized confidence); a human reviewer "
+                "must validate this synthesis before it is relied upon."
+            ),
             "model": BEDROCK_MODEL_ID,
         }
 

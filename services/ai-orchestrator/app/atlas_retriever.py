@@ -35,11 +35,19 @@ MONGO_URL = os.environ.get("MONGO_URL", "mongodb://app:app_dev_password@localhos
 MONGO_DB = os.environ.get("MONGO_DB", "foia_response_pipeline")
 COLLECTION_FOIA_PRECEDENT = "foia_precedent"
 
-# Confidence bar for retrieval (FOIA-conservative: weak hits are not usable
-# precedent — docs/retrieval-plan.md escalation rule + REQ-RAG-2 in
-# docs/prd/phase-1-ai-adoption.md). Defaults are provisional pending the W2
-# retrieval-eval pass; tune via env without a code change.
+# Confidence bar for the CALIBRATED hybrid path ONLY (FOIA-conservative:
+# weak hits are not usable precedent — docs/retrieval-plan.md escalation rule
+# + REQ-RAG-2 in docs/prd/phase-1-ai-adoption.md). The hybrid path's cosine
+# similarity is bounded/calibrated, so an absolute floor is meaningful there.
+# The lexical $text fallback does NOT use this absolute cut: Mongo $text scores
+# are not normalized confidence (magnitude scales with term frequency / corpus
+# state), so a fixed floor is meaningless on that path — it relies on rank/top-k
+# plus mandatory human review (see lexical_path_active + docs/hitl-plan.md).
+# Defaults are provisional pending the W2 retrieval-eval pass; tune via env
+# without a code change.
 MIN_SCORE = float(os.environ.get("CLAUSE_SEARCH_MIN_SCORE", "1.0"))
+# "Did retrieval return anything usable at all" floor, applied on BOTH paths:
+# an empty result means escalate (no grounded sources -> no synthesis).
 MIN_HITS = int(os.environ.get("CLAUSE_SEARCH_MIN_HITS", "1"))
 
 # Bounds hit text in responses/prompts; chunks are budgeted ~800 chars by the
@@ -115,18 +123,35 @@ def clause_search(query: str, top_k: int = 5, far_part: str | None = None,
     Resolution order:
       1. Atlas hybrid search — ONLY when ATLAS_HYBRID_ENABLED is set (the
          hybrid path is still a stub; import availability alone never routes
-         to it).
-      2. pymongo $text lexical search.
+         to it). This path's cosine similarity is calibrated, so hits scoring
+         below MIN_SCORE are dropped (absolute confidence bar).
+      2. pymongo $text lexical search — returns the ranked top-k AS-IS with NO
+         absolute MIN_SCORE cut. Mongo $text scores are not normalized
+         confidence (magnitude scales with term frequency / corpus state), so a
+         fixed floor is meaningless; the fallback relies on rank/top-k plus
+         mandatory human review (see lexical_path_active).
 
-    Hits scoring below MIN_SCORE are dropped (confidence bar). An empty list
-    means the search ran and found nothing usable; infrastructure failure
-    raises RetrievalUnavailableError instead.
+    An empty list means the search ran and found nothing usable; infrastructure
+    failure raises RetrievalUnavailableError instead.
     """
     if ATLAS_HYBRID_ENABLED and _LANGCHAIN_MONGODB_AVAILABLE:
         hits = _atlas_hybrid_search(query, top_k, far_part=far_part, agency_id=agency_id)
-    else:
-        hits = _pymongo_text_search(query, top_k, far_part=far_part, agency_id=agency_id)
-    return [hit for hit in hits if hit["score"] >= MIN_SCORE]
+        # Calibrated path: an absolute floor is meaningful on bounded cosine
+        # similarity, so drop sub-MIN_SCORE hits.
+        return [hit for hit in hits if hit["score"] >= MIN_SCORE]
+    # Lexical fallback: return the ranked top-k as-is (already sorted by
+    # textScore and limited to top_k by _pymongo_text_search). No absolute cut —
+    # $text scores are uncalibrated; gating is rank/top-k + mandatory review.
+    return _pymongo_text_search(query, top_k, far_part=far_part, agency_id=agency_id)
+
+
+def lexical_path_active() -> bool:
+    """True when retrieval is served by the uncalibrated lexical $text
+    fallback rather than the calibrated Atlas hybrid path. Callers MUST gate
+    synthesis behind mandatory human review when this is True — Mongo $text
+    scores are not normalized confidence, so synthesis cannot be treated as
+    authoritative without a reviewer (docs/hitl-plan.md, FOIA-conservative)."""
+    return not (ATLAS_HYBRID_ENABLED and _LANGCHAIN_MONGODB_AVAILABLE)
 
 
 def _atlas_hybrid_search(query: str, top_k: int, far_part: str | None = None,

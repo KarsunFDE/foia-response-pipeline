@@ -8,8 +8,10 @@ Contract summary (current implementation):
     _get_collection; wraps PyMongoError as RetrievalUnavailableError;
     never returns [] on failure.
   - clause_search: routes to Atlas ONLY when ATLAS_HYBRID_ENABLED=True AND
-    langchain-mongodb is importable; otherwise lexical. Applies MIN_SCORE
-    filter on results. Propagates RetrievalUnavailableError.
+    langchain-mongodb is importable; otherwise lexical. Applies the MIN_SCORE
+    floor ONLY on the calibrated hybrid path; the lexical $text path returns
+    ranked top-k as-is (uncalibrated → mandatory review at the endpoint).
+    Propagates RetrievalUnavailableError.
 
 Covers:
   - _doc_to_hit        — all fields (incl. agency_id), defaults, score coercion, text truncation
@@ -245,18 +247,45 @@ class TestClauseSearch:
         mock_atlas.assert_not_called()
 
     def test_min_score_filter_drops_low_confidence_hits(self) -> None:
+        # The absolute MIN_SCORE floor applies ONLY to the calibrated hybrid
+        # path (bounded cosine similarity). Exercise the hybrid path and assert
+        # sub-MIN_SCORE hits are dropped.
         hits = [
             {"clause_id": "a", "score": 0.5},
             {"clause_id": "b", "score": retriever.MIN_SCORE},
             {"clause_id": "c", "score": retriever.MIN_SCORE + 1.0},
         ]
-        with patch.object(retriever, "_LANGCHAIN_MONGODB_AVAILABLE", False):
-            with patch.object(retriever, "_pymongo_text_search", return_value=hits):
-                result = retriever.clause_search("query")
+        with patch.object(retriever, "ATLAS_HYBRID_ENABLED", True):
+            with patch.object(retriever, "_LANGCHAIN_MONGODB_AVAILABLE", True):
+                with patch.object(retriever, "_atlas_hybrid_search", return_value=hits):
+                    result = retriever.clause_search("query")
         returned_ids = [h["clause_id"] for h in result]
         assert "a" not in returned_ids
         assert "b" in returned_ids
         assert "c" in returned_ids
+
+    def test_lexical_path_returns_all_hits_no_min_score_cut(self) -> None:
+        # The lexical $text fallback's scores are uncalibrated, so NO absolute
+        # MIN_SCORE cut is applied — low-score hits are returned unfiltered.
+        hits = [
+            {"clause_id": "a", "score": 0.5},
+            {"clause_id": "b", "score": retriever.MIN_SCORE},
+            {"clause_id": "c", "score": retriever.MIN_SCORE + 1.0},
+        ]
+        with patch.object(retriever, "ATLAS_HYBRID_ENABLED", False):
+            with patch.object(retriever, "_LANGCHAIN_MONGODB_AVAILABLE", False):
+                with patch.object(retriever, "_pymongo_text_search", return_value=hits):
+                    result = retriever.clause_search("query")
+        returned_ids = [h["clause_id"] for h in result]
+        assert returned_ids == ["a", "b", "c"]
+
+    def test_lexical_path_active_reflects_flags(self) -> None:
+        # Default module state -> lexical fallback active.
+        assert retriever.lexical_path_active() is True
+        # Both flags set -> calibrated hybrid path active (not lexical).
+        with patch.object(retriever, "ATLAS_HYBRID_ENABLED", True):
+            with patch.object(retriever, "_LANGCHAIN_MONGODB_AVAILABLE", True):
+                assert retriever.lexical_path_active() is False
 
     def test_propagates_retrieval_error_when_mongo_unreachable(self) -> None:
         with patch.object(retriever, "_LANGCHAIN_MONGODB_AVAILABLE", False):
