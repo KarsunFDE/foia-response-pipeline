@@ -14,7 +14,7 @@ Thumbs.db
 *.swp
 *.swo
 
-# --- Java ---
+# --- Java / Maven ---
 target/
 *.class
 *.jar
@@ -28,6 +28,7 @@ __pycache__/
 *.py[cod]
 *.egg-info/
 .venv/
+.venv*/
 venv/
 .pytest_cache/
 .mypy_cache/

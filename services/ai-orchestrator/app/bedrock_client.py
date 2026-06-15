@@ -1,5 +1,9 @@
 """
-bedrock_client.py — thin wrapper around boto3's BedrockRuntime client.
+bedrock_client.py — LangChain ChatBedrock wrapper (replaces raw boto3 call).
+
+Routes all inference through langchain_aws.ChatBedrock so LangSmith can
+trace every invocation automatically via the LANGSMITH_API_KEY /
+LANGSMITH_TRACING env vars loaded by Docker Compose.
 
 Per D-060: real Bedrock InvokeModel authorized from W2 onward as an
 explicit exception to D-050 (AWS deferral). AWS *managed services*
@@ -18,25 +22,23 @@ remain deferred to W5 — this file is InvokeModel only.
   - Item 7 — pinecone-client still in requirements.txt; no `import pinecone`
     in this module.
 
-Stub fallback: if boto3 cannot resolve credentials (typical pre-W5 dev
-laptop), invoke_model returns a stub response shaped like the real one so
-the rest of the stack still flows. Real Bedrock InvokeModel runs whenever
-AWS_PROFILE / AWS_ACCESS_KEY_ID / EC2 IMDS resolves.
+Stub fallback: if ChatBedrock cannot initialise (no AWS credentials on a
+dev laptop), invoke_model returns a stub response shaped like the real one
+so the rest of the stack still flows.
 """
 from __future__ import annotations
 
-import json
 import logging
 import os
 from typing import Any
 
 try:
-    import boto3
+    from langchain_aws import ChatBedrock
+    from langchain_core.messages import HumanMessage, SystemMessage
     from botocore.exceptions import BotoCoreError, ClientError, NoCredentialsError
-    _BOTO_AVAILABLE = True
+    _LANGCHAIN_AWS_AVAILABLE = True
 except ImportError:  # pragma: no cover
-    boto3 = None  # type: ignore[assignment]
-    _BOTO_AVAILABLE = False
+    _LANGCHAIN_AWS_AVAILABLE = False
 
 log = logging.getLogger("ai-orchestrator.bedrock")
 
@@ -47,25 +49,29 @@ BEDROCK_MODEL_ID = os.environ.get(
 AWS_REGION = os.environ.get("AWS_REGION", "us-east-1")
 
 
-_client = None
+_chat_model = None
 
 
-def _get_client():
-    global _client
-    if _client is None and _BOTO_AVAILABLE:
-        try:
-            _client = boto3.client("bedrock-runtime", region_name=AWS_REGION)
-        except Exception as exc:
-            log.warning("bedrock-runtime client init failed: %s", exc)
-            _client = None
-    return _client
+def _get_chat_model(max_tokens: int, temperature: float) -> "ChatBedrock | None":
+    if not _LANGCHAIN_AWS_AVAILABLE:
+        return None
+    try:
+        return ChatBedrock(
+            model_id=BEDROCK_MODEL_ID,
+            region_name=AWS_REGION,
+            model_kwargs={"max_tokens": max_tokens, "temperature": temperature},
+        )
+    except Exception as exc:
+        log.warning("ChatBedrock init failed: %s", exc)
+        return None
 
 
 def invoke_model(prompt: str, *, system: str | None = None,
                   max_tokens: int = 1024,
                   temperature: float = 0.2) -> dict[str, Any]:
     """
-    InvokeModel against Anthropic Claude via Bedrock.
+    Invoke Anthropic Claude via Bedrock, routed through ChatBedrock so
+    LangSmith traces every call automatically.
 
     Returns a dict with keys:
       - body: the model's text response (or stub)
@@ -76,42 +82,29 @@ def invoke_model(prompt: str, *, system: str | None = None,
     ⚠ Item 4 — return shape NOT Pydantic-validated.
     ⚠ Item 6 — no correlation-id forwarded.
     """
-    client = _get_client()
-    if client is None:
-        log.info("bedrock stub-fallback (no boto3 / no credentials)")
+    llm = _get_chat_model(max_tokens, temperature)
+    if llm is None:
+        log.info("bedrock stub-fallback (langchain-aws unavailable)")
         return _stub(prompt)
 
-    messages = [{"role": "user", "content": prompt}]
-    body: dict[str, Any] = {
-        "anthropic_version": "bedrock-2023-05-31",
-        "max_tokens": max_tokens,
-        "temperature": temperature,
-        "messages": messages,
-    }
+    messages = []
     if system:
-        body["system"] = system
+        messages.append(SystemMessage(content=system))
+    messages.append(HumanMessage(content=prompt))
 
     try:
-        resp = client.invoke_model(
-            modelId=BEDROCK_MODEL_ID,
-            contentType="application/json",
-            accept="application/json",
-            body=json.dumps(body).encode("utf-8"),
-        )
-        payload = json.loads(resp["body"].read())
-        # Anthropic-on-Bedrock returns {"content": [{"type":"text","text":"..."}], ...}
-        text = ""
-        for block in payload.get("content", []):
-            if block.get("type") == "text":
-                text += block.get("text", "")
+        response = llm.invoke(messages)
         return {
-            "body": text or json.dumps(payload),
+            "body": response.content,
             "model": BEDROCK_MODEL_ID,
             "region": AWS_REGION,
             "stub": False,
         }
     except (NoCredentialsError, BotoCoreError, ClientError) as exc:
-        log.warning("bedrock InvokeModel failed (%s); returning stub", exc)
+        log.warning("ChatBedrock invoke failed (%s); returning stub", exc)
+        return _stub(prompt)
+    except Exception as exc:
+        log.warning("ChatBedrock invoke failed (%s); returning stub", exc)
         return _stub(prompt)
 
 
