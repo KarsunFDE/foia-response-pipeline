@@ -32,7 +32,7 @@ export const routes: Routes = [
   {
     path: 'dashboard',
     component: OfficerDashboardComponent,
-    canMatch: [roleGuard('contracting_officer', 'contract_specialist', 'program_manager', 'ssa', 'sys_admin')],
+    canMatch: [roleGuard('foia_officer', 'general_counsel', 'records_custodian', 'oip_oversight', 'contracting_officer', 'contract_specialist', 'program_manager', 'ssa', 'sys_admin')],
   },
   {
     path: 'reports',
