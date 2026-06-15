@@ -114,10 +114,14 @@ class TestGetCollection:
 
     def test_reuses_existing_client_singleton(self) -> None:
         mock_client = MagicMock()
+        mock_pymongo = MagicMock()
+        mock_pymongo.errors.PyMongoError = Exception
         retriever._mongo_client = mock_client
         with patch.object(retriever, "_PYMONGO_AVAILABLE", True):
-            retriever._get_collection()
+            with patch.object(retriever, "pymongo", mock_pymongo, create=True):
+                retriever._get_collection()
         mock_client.__getitem__.assert_called()
+        mock_pymongo.MongoClient.assert_not_called()
 
 
 # ---------------------------------------------------------------------------
@@ -272,3 +276,11 @@ class TestClauseSearch:
                 retriever.clause_search("query")
         _, called_top_k = mock_lex.call_args[0]
         assert called_top_k == 5
+
+    def test_propagates_retrieval_error_from_atlas_path(self) -> None:
+        with patch.object(retriever, "ATLAS_HYBRID_ENABLED", True):
+            with patch.object(retriever, "_LANGCHAIN_MONGODB_AVAILABLE", True):
+                with patch.object(retriever, "_atlas_hybrid_search",
+                                  side_effect=RetrievalUnavailableError("atlas down")):
+                    with pytest.raises(RetrievalUnavailableError, match="atlas down"):
+                        retriever.clause_search("exemptions")
