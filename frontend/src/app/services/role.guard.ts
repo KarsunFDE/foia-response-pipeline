@@ -20,6 +20,6 @@ export const roleGuard =
     if (role.hasAny(...allowed)) {
       return true;
     }
-    const fallback = role.currentRole === 'public' ? '/public/opportunities' : '/dashboard';
+    const fallback = role.currentRole === 'public' ? '/public/opportunities' : '/foiaRequests';
     return router.createUrlTree([fallback]);
   };
