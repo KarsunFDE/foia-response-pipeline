@@ -29,7 +29,9 @@ public class RouteConfig {
         return builder.routes()
             .route("foiaRequests", r -> r.path("/api/foia-requests/**").uri(foiaRequestUrl))
             .route("redactionReviews",   r -> r.path("/api/redaction-reviews/**").uri(redactionReviewUrl))
-            .route("ai",            r -> r.path("/api/ai/**").uri(aiUrl))
+            // stripPrefix(2) drops "/api/ai" so /api/ai/agent/intake-triage →
+            // ai-orchestrator /agent/intake-triage (FastAPI serves no /api/ai prefix).
+            .route("ai",            r -> r.path("/api/ai/**").filters(f -> f.stripPrefix(2)).uri(aiUrl))
             // Item 1 — public path forwards to foia-request-service after signature-skip.
             .route("public",        r -> r.path("/api/public/**").uri(foiaRequestUrl))
             .build();

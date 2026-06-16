@@ -129,7 +129,7 @@ def _chat(prompt: str, system: str) -> str:
     """Invoke Claude Sonnet via Bedrock; deterministic stub when creds absent."""
     model = _get_chat_model()
     if model is None:
-        return f"[stub] {system.split('.')[0]} :: {prompt[:120]}"
+        return _offline_stub(prompt, system)
     try:
         from langchain_core.messages import HumanMessage, SystemMessage
 
@@ -138,7 +138,39 @@ def _chat(prompt: str, system: str) -> str:
         return content if isinstance(content, str) else str(content)
     except Exception as exc:  # pragma: no cover - network/cred edge
         log.warning("bedrock chat failed (%s); returning stub", exc)
-        return f"[stub] {system.split('.')[0]} :: {prompt[:120]}"
+        return _offline_stub(prompt, system)
+
+
+def _offline_stub(prompt: str, system: str) -> str:
+    """Deterministic offline response used when AWS creds don't resolve.
+
+    GROUNDED, not invented: for the analysis step it echoes back ONLY the
+    (b)(N) exemption codes that already appear in the retrieved authority
+    passed in the prompt, so the analyze node proposes nothing the corpus did
+    not surface. Marked ``[offline-stub]`` so it is never mistaken for live
+    Bedrock output. With no retrieved authority (e.g. Mongo absent in tests)
+    no codes are present, so the fallback degrades to the prior plain stub
+    and the offline test contract is unchanged.
+    """
+    if "exemption" in system.lower():
+        # Prefer codes named in an authority TITLE/heading line (e.g.
+        # "Exemption (b)(5) — Deliberative-process privilege") — far more
+        # targeted than the all-nine enumeration chunk body. Fall back to the
+        # first few codes seen anywhere, capped so we never "propose" all nine.
+        title_codes = sorted({
+            f"(b)({n})"
+            for line in prompt.splitlines() if "exemption (b)" in line.lower()
+            for n in _EXEMPTION_RE.findall(line)
+        })
+        codes = title_codes or sorted({f"(b)({n})" for n in _EXEMPTION_RE.findall(prompt)})[:3]
+        if codes:
+            lines = [
+                f"{c} — supported by the cited authority retrieved above; "
+                f"a human reviewer confirms applicability and segregability."
+                for c in codes
+            ]
+            return "[offline-stub] Likely applicable exemptions:\n" + "\n".join(lines)
+    return f"[offline-stub] {system.split('.')[0]} :: {prompt[:120]}"
 
 
 def _now() -> str:

@@ -11,4 +11,7 @@ RUN npm run build
 # ⚠ Item 11 — nginx:latest also
 FROM nginx:latest
 COPY --from=build /workspace/dist/foia-response-pipeline-frontend/browser /usr/share/nginx/html
+# SPA routing + no-cache on index.html so new builds aren't masked by a stale
+# cached entry document (and route refreshes don't 404).
+COPY nginx.conf /etc/nginx/conf.d/default.conf
 EXPOSE 80

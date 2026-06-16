@@ -3,8 +3,9 @@ import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { Router } from '@angular/router';
 import { FoiaRequestService } from '../../services/foia-request.service';
+import { AgentService } from '../../services/agent.service';
+import { IntakeTriageRequest } from '../../models/triage';
 import {
-  FoiaRequest,
   FoiaRequestCreate,
   RequesterType,
   FeeCategory,
@@ -177,7 +178,11 @@ export class FoiaRequestWizardComponent {
     expeditedProcessingRequested: false,
   };
 
-  constructor(private svc: FoiaRequestService, private router: Router) {}
+  constructor(
+    private svc: FoiaRequestService,
+    private agent: AgentService,
+    private router: Router,
+  ) {}
 
   back(): void {
     if (this.step > 0) this.step--;
@@ -221,22 +226,33 @@ export class FoiaRequestWizardComponent {
   submit(): void {
     this.submitting = true;
     this.error = null;
+
+    // Stable request id that carries through triage (checkpointer thread_id).
+    const requestId =
+      `FOIA-${new Date().toISOString().slice(0, 10)}-` +
+      `${Math.random().toString(36).slice(2, 7).toUpperCase()}`;
+
+    // Best-effort persistence through the gateway (fire-and-forget; the
+    // agentic triage demo does not depend on the row landing).
     const payload: FoiaRequestCreate = {
       ...this.model,
       status: 'INTAKE_TRIAGE',
       receivedDate: new Date().toISOString(),
     };
-    this.svc.create(payload).subscribe({
-      next: (s: FoiaRequest) => {
-        this.submitting = false;
-        this.router.navigate(['/foiaRequests', s.id || 'foia-new', 'edit']);
-      },
-      error: () => {
-        // Brownfield reality: create may fail; for instructor demo, still
-        // route to the list as if it succeeded.
-        this.submitting = false;
-        this.router.navigate(['/foiaRequests']);
-      },
-    });
+    this.svc.create(payload).subscribe({ next: () => {}, error: () => {} });
+
+    // Start the agentic triage workflow and hand off to the HITL console.
+    const intake: IntakeTriageRequest = {
+      proposal_id: requestId,
+      foia_request_id: requestId,
+      raw_text: this.model.recordsSought,
+      requester_name: this.model.requesterName || undefined,
+      requester_contact: this.model.requesterOrg || undefined,
+      agency_id: this.model.agencyId,
+      date_range_start: this.model.dateRangeStart || undefined,
+      date_range_end: this.model.dateRangeEnd || undefined,
+    };
+    this.submitting = false;
+    this.router.navigate(['/foiaRequests', requestId, 'triage'], { state: { intake } });
   }
 }

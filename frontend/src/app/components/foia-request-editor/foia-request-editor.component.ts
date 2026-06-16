@@ -4,6 +4,8 @@ import { FormsModule } from '@angular/forms';
 import { ActivatedRoute, RouterLink } from '@angular/router';
 import { FoiaRequest, FOIA_EXEMPTIONS } from '../../models/foia-request';
 import { FIXTURE_SOLICITATIONS } from '../../services/mock-fixtures';
+import { AgentService } from '../../services/agent.service';
+import { TriageCitation } from '../../models/triage';
 
 /**
  * FOIA request workspace — exemption analysis + redaction proposal for a
@@ -70,11 +72,13 @@ import { FIXTURE_SOLICITATIONS } from '../../services/mock-fixtures';
             <em>Filtered by agency_id — Item 10 surface.</em>
           </p>
           <input [(ngModel)]="precedentQuery" (keyup.enter)="searchPrecedent()" placeholder="e.g., deliberative process (b)(5)"/>
-          <button (click)="searchPrecedent()" style="margin-top:0.5rem">Search</button>
+          <button (click)="searchPrecedent()" [disabled]="searching" style="margin-top:0.5rem">{{ searching ? 'Searching…' : 'Search' }}</button>
+          <div *ngIf="precedentReview" style="background:#fde8d3;color:var(--color-accent-dark);padding:0.4rem 0.6rem;border-radius:6px;margin-top:0.5rem;font-size:0.8rem">⚠ {{ precedentReview }}</div>
           <ul *ngIf="precedentResults.length > 0">
             <li *ngFor="let c of precedentResults">
-              <strong>{{ c.id }}</strong> — {{ c.title }}
-              <button class="secondary" style="font-size:0.75rem;padding:0.1rem 0.35rem">Cite</button>
+              <strong>{{ c.cite || c.clause_id }}</strong> — {{ c.title }}
+              <div style="font-size:0.75rem;color:var(--color-fg-muted)">{{ c.source_file }} · score {{ (c.score || 0) | number:'1.0-2' }}</div>
+              <div *ngIf="c.text_snippet" style="font-size:0.8rem;color:var(--color-fg-muted)">{{ c.text_snippet }}</div>
             </li>
           </ul>
         </div>
@@ -109,12 +113,14 @@ export class FoiaRequestEditorComponent implements OnInit {
   recordsSought = '';
   rationale = '';
   precedentQuery = '';
-  precedentResults: { id: string; title: string }[] = [];
+  precedentResults: TriageCitation[] = [];
+  precedentReview: string | null = null;
+  searching = false;
   targetState = 'EXEMPTION_ANALYSIS';
   exemptions = FOIA_EXEMPTIONS;
   claimed: Record<string, boolean> = {};
 
-  constructor(private route: ActivatedRoute) {}
+  constructor(private route: ActivatedRoute, private agent: AgentService) {}
 
   ngOnInit(): void {
     this.id = this.route.snapshot.params['id'];
@@ -146,12 +152,25 @@ export class FoiaRequestEditorComponent implements OnInit {
   }
 
   searchPrecedent(): void {
-    // Stub — in W2, hits POST /rag/clause-search over the FOIA precedent corpus.
-    const q = this.precedentQuery.toLowerCase();
-    this.precedentResults = [
-      { id: '5 USC 552(b)(5)', title: 'Deliberative-process privilege' },
-      { id: '5 USC 552(b)(6)', title: 'Personal-privacy balancing' },
-      { id: '28 CFR 16.6', title: 'DOJ FOIA responses to requests' },
-    ].filter((c) => !q || c.id.toLowerCase().includes(q) || c.title.toLowerCase().includes(q));
+    const q = this.precedentQuery.trim();
+    if (!q) return;
+    this.searching = true;
+    this.precedentReview = null;
+    // Real hybrid RAG over the FOIA corpus via the gateway (/api/ai/rag/clause-search).
+    // agency_id scopes retrieval (Item 10); below-confidence results escalate.
+    this.agent.clauseSearch(q, { agency_id: this.foiaRequest?.agencyId, top_k: 5 }).subscribe({
+      next: (res) => {
+        this.precedentResults = res.hits || [];
+        this.precedentReview = res.needs_review
+          ? (res.review_reason || 'Flagged for mandatory human review.')
+          : null;
+        this.searching = false;
+      },
+      error: (err) => {
+        this.precedentReview = `Search failed: ${err?.message ?? err}`;
+        this.precedentResults = [];
+        this.searching = false;
+      },
+    });
   }
 }

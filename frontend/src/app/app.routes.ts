@@ -5,6 +5,7 @@ import { RedactionReviewPanelComponent } from './components/redaction-review-pan
 import { OfficerDashboardComponent } from './components/officer-dashboard/officer-dashboard.component';
 import { ReportsHubComponent } from './components/reports-hub/reports-hub.component';
 import { FoiaRequestWizardComponent } from './components/foia-request-wizard/foia-request-wizard.component';
+import { TriageConsoleComponent } from './components/triage-console/triage-console.component';
 import { FoiaRequestEditorComponent } from './components/foia-request-editor/foia-request-editor.component';
 import { AmendmentEditorComponent } from './components/amendment-editor/amendment-editor.component';
 import { QnaTriageComponent } from './components/qna-triage/qna-triage.component';
@@ -52,7 +53,13 @@ export const routes: Routes = [
   {
     path: 'foiaRequests/new',
     component: FoiaRequestWizardComponent,
-    canMatch: [roleGuard('contracting_officer', 'contract_specialist')],
+    canMatch: [roleGuard('foia_officer', 'general_counsel', 'records_custodian')],
+  },
+  // Agentic triage HITL console (ADR 0005) — wizard submit hands off here.
+  {
+    path: 'foiaRequests/:id/triage',
+    component: TriageConsoleComponent,
+    canMatch: [roleGuard('foia_officer', 'general_counsel', 'records_custodian')],
   },
   // Legacy single-page create form kept available under a sub-route so the
   // brownfield baseline is still demoable.
