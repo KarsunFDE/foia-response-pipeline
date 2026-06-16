@@ -57,7 +57,7 @@ items:
 
   - id: 5
     name: pre-v1-langchain-patterns
-    locked: true
+    locked: false   # W4 — migrated to LangChain v1.0; legacy_chain.py deleted (ADR 0005 triage workflow)
     scheduled_unlock_week: W2-Mon
     teaching_anchor: RAG-Architecture-week-anchor
     test_marker: brownfield_debt_5
@@ -77,7 +77,7 @@ items:
 
   - id: 7
     name: unused-pinecone-client
-    locked: true
+    locked: false   # W4 — pinecone-client removed from requirements.txt (Atlas Vector Search is the vector path)
     scheduled_unlock_week: W2-Mon
     teaching_anchor: Atlas-Vector-Search-introduction
     test_marker: brownfield_debt_7

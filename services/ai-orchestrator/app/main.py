@@ -12,13 +12,11 @@ DELIBERATE BROWNFIELD DEBT (annotated for cohort discovery):
            AI endpoints. (`clause_id` and the per-endpoint response keys are
            kept after the FOIA domain reshape — only prompt TEXT changed.)
 
-  Item 5 (partial) — This file uses the LangChain v1.0+ composed-Runnable
-           pattern (prompt | llm | parser). The legacy LLMChain(...).run(...)
-           pattern lives in app/legacy_chain.py and is invoked from 3 entry
-           points: /draft-foia-request (response-letter draft), /draft-amendment
-           (exemption-determination draft), and the notification-copy generator
-           (called upstream via the Spring Notifier path which fans to
-           /draft-amendment). Cohort consolidates in W2.
+  Item 5 — CLOSED (W4). Migrated to LangChain v1.0; the pre-v1.0 pattern in
+           app/legacy_chain.py was deleted and the agentic FOIA triage workflow
+           (ADR 0005) is built on LangGraph (app/triage_workflow.py) with a
+           MongoDB checkpointer for HITL pause/resume. Lockfile flipped
+           locked: true -> false for item 5 (debt-touch-approved required).
 
   Item 6 (partial) — No correlation-ID logging at all. Other services log
            X-Request-ID / correlationId / traceId — this one logs nothing.
@@ -46,8 +44,7 @@ from typing import Any
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
 
-# ⚠ Item 5 — v1.0 composed-Runnable style. Imported but not actually wired to
-# Bedrock in the stub (we return mock data). Cohort wires it up in W1 Thu.
+# LangChain v1.0 composed-Runnable primitives (Item 5 migration complete).
 try:
     from langchain_core.prompts import ChatPromptTemplate
     from langchain_core.output_parsers import StrOutputParser
@@ -55,12 +52,17 @@ try:
 except ImportError:
     _LANGCHAIN_V1_AVAILABLE = False
 
-# Note: legacy_chain.py also exists in this package and uses the pre-v1.0
-# LLMChain pattern. Item 5 — cohort migrates that file's style to this one.
-from app import legacy_chain  # noqa: F401 — imported to keep the v0.x entry
-                                # point reachable; cohort grep finds the seam.
 from app.bedrock_client import invoke_model, BEDROCK_MODEL_ID, AWS_REGION
 from app import atlas_retriever
+from app import triage_workflow
+from app.triage_models import (
+    DateRange,
+    FoiaTriageState,
+    GateDecision,
+    RecommendationOutcome,
+    RequesterInfo,
+    ReviewAction,
+)
 
 # ⚠ DELIBERATE — no correlation-ID in the log format (Item 6).
 logging.basicConfig(
@@ -145,10 +147,43 @@ class FactorSuggestRequest(BaseModel):
 
 
 class IntakeTriageRequest(BaseModel):
-    """Multi-agent FOIA-request intake triage request. ⚠ Item 4 — no Field."""
+    """Start the agentic FOIA triage workflow (ADR 0005). `proposal_id` is the
+    legacy key that carries the FOIA request id (domain-mapping.md)."""
     proposal_id: str  # legacy field name; carries the FOIA request id
     foia_request_id: str | None = None
     raw_text: str | None = None
+    requester_name: str | None = None
+    requester_contact: str | None = None
+    agency_id: str | None = None
+    date_range_start: str | None = None
+    date_range_end: str | None = None
+
+
+class TriageResumeRequest(BaseModel):
+    """Inject a human reviewer's gate decision to resume a paused run."""
+    request_id: str
+    action: ReviewAction
+    note: str | None = None
+    corrected_keywords: list[str] | None = None
+    final_outcome: RecommendationOutcome | None = None
+
+
+class TriageResult(BaseModel):
+    """Typed triage workflow result (ADR 0005 §4 — typed inter-stage payload).
+
+    Carries either an awaiting-review gate package or the completed/escalated
+    disposition. `status` ∈ {awaiting_review, complete, escalated}.
+    """
+    request_id: str
+    status: str
+    gate: str | None = None
+    review_package: dict[str, Any] | None = None
+    final_outcome: str | None = None
+    recommendation: dict[str, Any] | None = None
+    needs_review: bool | None = None
+    review_reason: str | None = None
+    audit_log: list[dict[str, Any]] | None = None
+    thread_id: str | None = None
 
 
 class ExemptionAnalysisRequest(BaseModel):
@@ -226,9 +261,6 @@ def draft_amendment(req: DraftRequest) -> dict[str, Any]:
     partial grant / denial; 5 USC 552(b), 28 CFR 16.6).
 
     ⚠ Item 4 — no Pydantic response model.
-    ⚠ Item 5 — routes through legacy_chain construction (the legacy LLMChain
-       pattern is imported + constructed via legacy_chain.draft_with_legacy_chain
-       upstream in the call graph). This is entry point #2 of 3 for Item 5.
     ⚠ Item 6 — no correlation-id forwarded.
 
     NOTE: path + response keys (`amendment_text`, `predicted_vendor_impact`)
@@ -418,8 +450,6 @@ def eval_ssdd_draft(req: DraftRequest) -> dict[str, Any]:
     decision basis). General-Counsel-gated because release is irreversible.
 
     ⚠ Item 4 — no Pydantic response model.
-    ⚠ Item 5 — third entry point; copy generated via legacy_chain when the
-       upstream notification path requests determination copy generation.
     ⚠ Item 6 — no correlation-id forwarded.
 
     NOTE: path + the `ssdd_narrative` / `clause_id` response keys are
@@ -441,45 +471,58 @@ def eval_ssdd_draft(req: DraftRequest) -> dict[str, Any]:
     }
 
 
-@app.post("/agent/intake-triage")
+@app.post("/agent/intake-triage", response_model=TriageResult)
 def agent_intake_triage(req: IntakeTriageRequest) -> dict[str, Any]:
     """
-    Multi-agent W3 flow: triage an incoming FOIA request, route to the
-    Records Custodian, escalate sensitive material to General Counsel.
+    Start the agentic FOIA triage workflow (ADR 0005).
 
-    Sequential agent invocations (intake-classifier → custodian-router →
-    sensitivity-escalator); each call is currently a single Bedrock invoke
-    with the same stub fallback. LangGraph wiring comes in W3.
+    Runs the LangGraph pipeline (intake → classify → route → retrieve+score →
+    analyze) until the first HITL gate, then pauses and returns the gate's
+    review package. Retrieval, the score/top-k cut, and precedent pull are
+    deterministic atlas_retriever tool calls — the LLM never retrieves or
+    thresholds (ADR 0005 §2). Resume with POST /agent/intake-triage/resume.
 
-    ⚠ Item 4 — no Pydantic response model.
-    ⚠ Item 6 — no correlation-id forwarded; each agent hop is invisible in
-       the audit log because nothing threads a request id through.
+    State is checkpointed in MongoDB keyed by request_id, so a paused decision
+    survives a restart and resumes without regeneration (REQ-AGT-3).
 
-    NOTE: path + response keys retained (legacy `proposal_id` field carries
-    the FOIA request id); only prompt TEXT reshaped to FOIA.
+    NOTE: `proposal_id` carries the FOIA request id (domain-mapping.md).
     """
-    log.info("agent/intake-triage proposal_id=%r", req.proposal_id)
-    classify = invoke_model(
-        f"Classify this FOIA request's scope + complexity: {req.raw_text or req.proposal_id}",
-        system="You classify FOIA requests for custodian routing + fee category.",
+    request_id = req.foia_request_id or req.proposal_id
+    log.info("agent/intake-triage start request_id=%r", request_id)
+    date_range = None
+    if req.date_range_start or req.date_range_end:
+        date_range = DateRange(start=req.date_range_start, end=req.date_range_end)
+    state = FoiaTriageState(
+        request_id=request_id,
+        foia_request=req.raw_text or "",
+        requester_info=RequesterInfo(
+            name=req.requester_name, contact=req.requester_contact
+        ),
+        agency_id=req.agency_id,
+        date_range=date_range,
     )
-    route = invoke_model(
-        f"Recommend the records custodian(s) for foia_request={req.proposal_id}.",
-        system="You route FOIA requests to records custodians by record system.",
+    return triage_workflow.start_triage(state)
+
+
+@app.post("/agent/intake-triage/resume", response_model=TriageResult)
+def agent_intake_triage_resume(req: TriageResumeRequest) -> dict[str, Any]:
+    """
+    Resume a paused triage run with a human reviewer's gate decision (HITL).
+
+    The system never auto-releases or auto-withholds — a recorded human
+    decision drives every gate (REQ-AGT-2/REQ-AID-4). A Gate 2 scope
+    correction loops back through retrieval + analysis on the approved
+    snapshot; a Gate 3 escalation stops rather than silently continuing.
+    """
+    log.info("agent/intake-triage resume request_id=%r action=%r",
+             req.request_id, req.action)
+    decision = GateDecision(
+        action=req.action,
+        note=req.note,
+        corrected_keywords=req.corrected_keywords,
+        final_outcome=req.final_outcome,
     )
-    anomaly = invoke_model(
-        f"Flag material in foia_request={req.proposal_id} that warrants General Counsel review.",
-        system="You flag sensitive material (b)(1)/(b)(6)/(b)(7) for GC escalation.",
-    )
-    return {
-        "proposal_id": req.proposal_id,
-        "classification": classify["body"],
-        "routing": route["body"],
-        "anomalies": anomaly["body"],
-        "escalation_required": "GC" if "exempt" in anomaly["body"].lower() else None,
-        "hitl_gate": "gc-review-on-escalation",
-        "model": BEDROCK_MODEL_ID,
-    }
+    return triage_workflow.resume_triage(req.request_id, decision)
 
 
 @app.post("/analyze-exemptions")

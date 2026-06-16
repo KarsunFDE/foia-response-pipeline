@@ -9,14 +9,13 @@ remain deferred to W5 — this file is InvokeModel only.
 ⚠ DELIBERATE: brownfield-debt items preserved across this Bedrock wiring:
   - Item 4 — caller endpoints still return raw dicts; no Pydantic
     response_model on /draft-foia-request, /draft-amendment, /answer-qa,
-    or /eval/ssdd-draft.
-  - Item 5 — legacy_chain.py still in place; 3 endpoints below thread
-    through draft_with_legacy_chain (Drafting Wizard via /draft-foia-request,
-    Amendment Editor via /draft-amendment, notification-copy via
-    Notifier.cparWindowOpened upstream — invoked by Spring side).
+    or /eval/ssdd-draft. (Still LOCKED — unrelated to the W4 triage work.)
   - Item 6 — no correlation-id forwarded into the Bedrock InvokeModel call.
-  - Item 7 — pinecone-client still in requirements.txt; no `import pinecone`
-    in this module.
+
+Note: invoke_model() here stays the InvokeModel path the legacy /draft-* and
+/eval/* endpoints use. The agentic triage workflow (ADR 0005) uses the
+LangChain v1.0 ChatBedrockConverse model in app/triage_workflow.py.
+Items 5 (legacy_chain) and 7 (pinecone-client) were CLOSED in W4.
 
 Stub fallback: if boto3 cannot resolve credentials (typical pre-W5 dev
 laptop), invoke_model returns a stub response shaped like the real one so
