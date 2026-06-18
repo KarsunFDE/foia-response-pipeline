@@ -50,3 +50,5 @@ data/seed/foia-precedent-chunks.jsonl
 
 # --- AI assistant local config ---
 CLAUDE.md
+services/ai-orchestrator/.venv311/
+.claude/settings.local.json
